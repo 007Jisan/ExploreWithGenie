@@ -19,7 +19,7 @@ import AgencyDashboard from './pages/AgencyDashboard';
 // ==========================================
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+  return token ? children : <Navigate to="/login" replace />;
 };
 
 // ==========================================
@@ -30,13 +30,12 @@ const RoleRoute = ({ children, allowedRoles }) => {
   const userRole = localStorage.getItem('role'); // লগইনের সময় সেভ করা রোল
 
   if (!token) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
   
-  // যদি ইউজারের রোল allowedRoles-এর মধ্যে না থাকে, তাহলে তাকে হোমে পাঠিয়ে দেবে
+  // ইউজারের রোল না মিললে সরাসরি হোমে পাঠিয়ে দেবে, কোনো alert দেওয়া যাবে না (দিলে সাদা পেজ আসবে)
   if (!allowedRoles.includes(userRole)) {
-    alert('Access Denied: You do not have permission to view this page! 🚫');
-    return <Navigate to="/" />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
