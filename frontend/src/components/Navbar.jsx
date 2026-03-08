@@ -27,7 +27,7 @@ const Navbar = () => {
           {/* লেফট সাইড: লোগো এবং মেইন লিংকস */}
           <div className="flex items-center">
             
-            {/* 🔥 লোগো এবং নাম (সাইজ একদম পারফেক্ট করা হয়েছে) */}
+            {/* 🔥 লোগো এবং নাম */}
             <Link to="/" className="flex items-center flex-shrink-0 group">
               <div className="h-11 w-11 md:h-12 md:w-12 rounded-full overflow-hidden border-2 border-[#00df9a]/40 bg-white p-0.5 shadow-md group-hover:border-[#00df9a] transition-all duration-300">
                 <img 
@@ -52,6 +52,7 @@ const Navbar = () => {
                 Destinations
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#00df9a] transition-all group-hover:w-full"></span>
               </Link>
+              {/* About Link */}
               <Link to="/about" className="text-gray-300 hover:text-[#00df9a] font-medium transition-all text-sm uppercase tracking-wider relative group">
                 About
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#00df9a] transition-all group-hover:w-full"></span>

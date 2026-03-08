@@ -13,6 +13,8 @@ import Signup from './pages/Signup';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
+import About from './pages/About'; 
+ 
 
 // ==========================================
 // 🔒 সাধারণ প্রোটেক্টেড রুট (যেকোনো লগইন করা ইউজারের জন্য)
@@ -27,13 +29,13 @@ const PrivateRoute = ({ children }) => {
 // ==========================================
 const RoleRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('token');
-  const userRole = localStorage.getItem('role'); // লগইনের সময় সেভ করা রোল
+  const userRole = localStorage.getItem('role'); // লগইনের সময় সেভ করা রোল
 
   if (!token) {
     return <Navigate to="/login" replace />;
   }
   
-  // ইউজারের রোল না মিললে সরাসরি হোমে পাঠিয়ে দেবে, কোনো alert দেওয়া যাবে না (দিলে সাদা পেজ আসবে)
+  // ইউজারের রোল না মিললে সরাসরি হোমে পাঠিয়ে দেবে, কোনো alert দেওয়া যাবে না (দিলে সাদা পেজ আসবে)
   if (!allowedRoles.includes(userRole)) {
     return <Navigate to="/" replace />;
   }
@@ -51,6 +53,7 @@ function App() {
           <Routes>
             {/* পাবলিক রুটস */}
             <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} /> {/* 👈 এই লাইনটি যোগ করা হয়েছে */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
 
