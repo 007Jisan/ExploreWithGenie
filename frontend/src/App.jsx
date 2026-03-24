@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// 👇 Context & AI Chatbot ইম্পোর্ট করা হলো
+// 👇 Context & AI Chatbot
 import { LanguageProvider } from './context/LanguageContext';
 import Chatbot from './components/Chatbot';
 
@@ -18,10 +18,9 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import About from './pages/About'; 
- 
 
 // ==========================================
-// 🔒 সাধারণ প্রোটেক্টেড রুট (যেকোনো লগইন করা ইউজারের জন্য)
+// 🔒 PrivateRoute
 // ==========================================
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -29,45 +28,41 @@ const PrivateRoute = ({ children }) => {
 };
 
 // ==========================================
-// 🛡️ রোল-বেসড প্রোটেক্টেড রুট (অ্যাডমিন/এজেন্সির জন্য)
+// 🛡️ RoleRoute
 // ==========================================
 const RoleRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('token');
-  const userRole = localStorage.getItem('role'); // লগইনের সময় সেভ করা রোল
+  const userRole = localStorage.getItem('role'); 
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  // ইউজারের রোল না মিললে সরাসরি হোমে পাঠিয়ে দেবে, কোনো alert দেওয়া যাবে না (দিলে সাদা পেজ আসবে)
-  if (!allowedRoles.includes(userRole)) {
-    return <Navigate to="/" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(userRole)) return <Navigate to="/" replace />;
 
   return children;
 };
 
 function App() {
   return (
-    // 👇 পুরো অ্যাপটাকে LanguageProvider দিয়ে মুড়িয়ে দেওয়া হলো
+    // 🌍 LanguageProvider সবার উপরে থাকবে
     <LanguageProvider>
       <Router>
         <div className="App font-sans bg-gray-50 min-h-screen flex flex-col">
+          
+          {/* 🧭 Navbar কনটেক্সটের ভেতরে থাকায় এখন ল্যাঙ্গুয়েজ পাবে */}
           <Navbar />
           
           <main className="flex-grow pt-20"> 
             <Routes>
-              {/* পাবলিক রুটস */}
+              {/* Public Routes */}
               <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} /> {/* 👈 এই লাইনটি যোগ করা হয়েছে */}
+              <Route path="/about" element={<About />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
 
-              {/* 🔒 প্রাইভেট রুটস (সব লগইন করা ইউজারের জন্য) */}
+              {/* Private Routes */}
               <Route path="/country/bangladesh" element={<PrivateRoute><Bangladesh /></PrivateRoute>} />
               <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
               
-              {/* 🛡️ অ্যাডমিন রুট (শুধুমাত্র admin ঢুকতে পারবে) */}
+              {/* Admin Route */}
               <Route 
                 path="/admin" 
                 element={
@@ -77,7 +72,7 @@ function App() {
                 } 
               />
 
-              {/* 💼 এজেন্সি রুট (শুধুমাত্র agency ঢুকতে পারবে) */}
+              {/* Agency Route */}
               <Route 
                 path="/agency-login" 
                 element={
@@ -89,9 +84,8 @@ function App() {
             </Routes>
           </main>
 
-          {/* 👇 এআই চ্যাটবট এখানে অ্যাড করা হলো (যাতে ওয়েবসাইটের সব পেজেই এটি শো করে) */}
+          {/* 🤖 Chatbot & 🦶 Footer */}
           <Chatbot />
-
           <Footer />
         </div>
       </Router>

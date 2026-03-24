@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { useLanguage } from '../context/LanguageContext'; // 👈 শুধু এটা যোগ করলাম
 
 // Leaflet এর আইকন ফিক্স করার জন্য
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -19,6 +20,8 @@ const Bangladesh = () => {
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const { t, language } = useLanguage(); // 👈 ল্যাঙ্গুয়েজ স্টেট নিলাম
 
   // 🚀 ডাটাবেস থেকে ডাটা আনার API
   useEffect(() => {
@@ -54,7 +57,7 @@ const Bangladesh = () => {
     place.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🔥 গুগল ম্যাপের একদম অফিশিয়াল লিংক
+  // 🔥 গুগল ম্যাপের একদম অফিশিয়াল লিংক
   const openDynamicRouteMap = (query) => {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
   };
@@ -62,7 +65,9 @@ const Bangladesh = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen bg-[#f8fafc]">
-        <div className="text-2xl font-bold text-[#00df9a] animate-pulse">Loading Destinations...</div>
+        <div className="text-2xl font-bold text-[#00df9a] animate-pulse">
+          {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading Destinations...'}
+        </div>
       </div>
     );
   }
@@ -74,10 +79,12 @@ const Bangladesh = () => {
         {/* Clean Header - Professional Text */}
         <div className="text-center mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-[#0a192f] mb-4">
-            Explore Beautiful Bangladesh <span className="text-[#00df9a]">🇧🇩</span>
+            {language === 'bn' ? 'সুন্দর বাংলাদেশ ঘুরে দেখুন' : 'Explore Beautiful Bangladesh'} <span className="text-[#00df9a]">🇧🇩</span>
           </h1>
           <p className="text-gray-500 font-medium max-w-2xl mx-auto mb-6 text-lg">
-            Discover historical landmarks, breathtaking landscapes, and hidden gems across the country.
+            {language === 'bn' 
+              ? 'ঐতিহাসিক নিদর্শন, শ্বাসরুদ্ধকর ল্যান্ডস্কেপ এবং দেশের লুকানো রত্নগুলো আবিষ্কার করুন।' 
+              : 'Discover historical landmarks, breathtaking landscapes, and hidden gems across the country.'}
           </p>
           <div className="h-1.5 w-24 bg-[#00df9a] mx-auto rounded-full shadow-sm mb-8"></div>
         </div>
@@ -88,7 +95,7 @@ const Bangladesh = () => {
             <span className="absolute inset-y-0 left-4 flex items-center text-gray-400 text-xl">🔍</span>
             <input
               type="text"
-              placeholder="Filter by spot name or location..."
+              placeholder={language === 'bn' ? 'স্পট বা লোকেশন দিয়ে খুঁজুন...' : 'Filter by spot name or location...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00df9a] shadow-sm text-gray-700 bg-white font-medium"
@@ -125,13 +132,13 @@ const Bangladesh = () => {
                       onClick={() => setSelectedSpot(place)}
                       className="flex-1 bg-[#0a192f] text-white text-sm font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-colors shadow-sm active:scale-95"
                     >
-                      View Details
+                      {t('exploreBtn')}
                     </button>
                     <button 
-                      onClick={() => openDynamicRouteMap(place.mapQuery)}
+                      onClick={() => openDynamicRouteMap(place.name)}
                       className="flex-1 bg-green-50 text-green-700 border border-green-200 text-sm font-bold py-3.5 rounded-xl hover:bg-green-600 hover:text-white transition-colors flex items-center justify-center gap-2 shadow-sm active:scale-95"
                     >
-                      🗺️ Route Map
+                      🗺️ {language === 'bn' ? 'ম্যাপ' : 'Route Map'}
                     </button>
                   </div>
                 </div>
@@ -140,7 +147,7 @@ const Bangladesh = () => {
             ))
           ) : (
             <div className="col-span-full text-center py-10 text-gray-500 font-bold text-xl">
-              No places found matching your search. 🕵️‍♂️
+              {language === 'bn' ? 'কিছু পাওয়া যায়নি 🕵️‍♂️' : 'No places found matching your search. 🕵️‍♂️'}
             </div>
           )}
         </div>
@@ -204,7 +211,7 @@ const Bangladesh = () => {
                   <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">🕒</div>
                     <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">Best Time</h4>
+                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'সেরা সময়' : 'Best Time'}</h4>
                       <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.bestVisitingTime}</p>
                     </div>
                   </div>
@@ -212,7 +219,7 @@ const Bangladesh = () => {
                   <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">💰</div>
                     <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">Budget</h4>
+                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{t('budget')}</h4>
                       <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.estimatedBudget}</p>
                     </div>
                   </div>
@@ -220,7 +227,7 @@ const Bangladesh = () => {
                   <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">🏨</div>
                     <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">Nearby Hotels</h4>
+                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'কাছের হোটেল' : 'Nearby Hotels'}</h4>
                       <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.nearbyHotels}</p>
                     </div>
                   </div>
@@ -228,13 +235,13 @@ const Bangladesh = () => {
                   <div className="flex items-center gap-3 p-3.5 bg-red-50/50 rounded-2xl border border-red-100 shadow-sm">
                     <div className="text-2xl bg-white p-2.5 rounded-xl shadow-sm">🛡️</div>
                     <div>
-                      <h4 className="font-bold text-red-900 text-xs uppercase tracking-wider mb-1">Safety Notice</h4>
+                      <h4 className="font-bold text-red-900 text-xs uppercase tracking-wider mb-1">{language === 'bn' ? 'সতর্কতা' : 'Safety Notice'}</h4>
                       <p className="text-sm text-red-700 font-bold leading-snug">{selectedSpot.safetyTips}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* 🗺️ Live Leaflet Map Container (Inside Details) */}
+                {/* 🗺️ Live Leaflet Map Container */}
                 <div className="h-64 lg:h-full w-full rounded-2xl overflow-hidden border border-gray-200 relative z-0 shadow-sm">
                   <MapContainer center={[selectedSpot.lat, selectedSpot.lng]} zoom={13} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -252,13 +259,13 @@ const Bangladesh = () => {
                   onClick={closeModal}
                   className="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
                 >
-                  Close
+                  {language === 'bn' ? 'বন্ধ করুন' : 'Close'}
                 </button>
                 <button 
-                  onClick={() => openDynamicRouteMap(selectedSpot.mapQuery)}
-                  className="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold text-[#0a192f] bg-[#00df9a] hover:bg-[#00c98a] transition-all flex gap-2 items-center justify-center shadow-md active:scale-95 transform hover:-translate-y-0.5"
+                  onClick={() => openDynamicRouteMap(selectedSpot.name)}
+                  className="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold text-[#0a192f] bg-[#00df9a] hover:bg-[#00c98a] transition-all flex gap-2 items-center justify-center shadow-md"
                 >
-                  <span>🗺️</span> Get Directions
+                  <span>🗺️</span> {language === 'bn' ? 'ম্যাপ দেখুন' : 'Get Directions'}
                 </button>
               </div>
               
