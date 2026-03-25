@@ -21,7 +21,7 @@ const Bangladesh = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const { t, language } = useLanguage(); // 👈 ল্যাঙ্গুয়েজ স্টেট নিলাম
+  const { t, language } = useLanguage(); // 👈 ল্যাঙ্গুয়েজ স্টেট নিলাম
 
   // 🚀 ডাটাবেস থেকে ডাটা আনার API
   useEffect(() => {
@@ -95,7 +95,7 @@ const Bangladesh = () => {
             <span className="absolute inset-y-0 left-4 flex items-center text-gray-400 text-xl">🔍</span>
             <input
               type="text"
-              placeholder={language === 'bn' ? 'স্পট বা লোকেশন দিয়ে খুঁজুন...' : 'Filter by spot name or location...'}
+              placeholder={language === 'bn' ? 'স্পট বা লোকেশন দিয়ে খুঁজুন...' : 'Filter by spot name or location...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00df9a] shadow-sm text-gray-700 bg-white font-medium"
@@ -115,16 +115,18 @@ const Bangladesh = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0a192f]/80 via-transparent to-transparent opacity-90"></div>
                   
                   <div className="absolute top-4 right-4 bg-white/95 text-[#0a192f] text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5">
-                    <span className="text-red-500 text-sm">📍</span> {place.location}
+                    <span className="text-red-500 text-sm">📍</span> {language === 'bn' && place.locationBN ? place.locationBN : place.location}
                   </div>
                   
-                  <h3 className="absolute bottom-4 left-5 text-2xl font-bold text-white tracking-wide">{place.name}</h3>
+                  <h3 className="absolute bottom-4 left-5 text-2xl font-bold text-white tracking-wide">
+                    {language === 'bn' && place.nameBN ? place.nameBN : place.name}
+                  </h3>
                 </div>
 
                 {/* Card Content */}
                 <div className="p-6 flex flex-col flex-grow bg-white">
                   <p className="text-gray-600 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">
-                    {place.description}
+                    {language === 'bn' && place.descriptionBN ? place.descriptionBN : place.description}
                   </p>
 
                   <div className="mt-auto flex gap-3 pt-3 border-t border-gray-50">
@@ -147,7 +149,7 @@ const Bangladesh = () => {
             ))
           ) : (
             <div className="col-span-full text-center py-10 text-gray-500 font-bold text-xl">
-              {language === 'bn' ? 'কিছু পাওয়া যায়নি 🕵️‍♂️' : 'No places found matching your search. 🕵️‍♂️'}
+              {language === 'bn' ? 'কিছু পাওয়া যায়নি 🕵️‍♂️' : 'No places found matching your search. 🕵️‍♂️'}
             </div>
           )}
         </div>
@@ -190,10 +192,10 @@ const Bangladesh = () => {
               
               <div className="absolute bottom-6 left-6 z-10">
                 <span className="bg-[#00df9a] text-[#0a192f] text-[10px] font-bold px-2 py-0.5 rounded-md mb-2 inline-block uppercase tracking-wider">
-                  📍 {selectedSpot.location}
+                  📍 {language === 'bn' && selectedSpot.locationBN ? selectedSpot.locationBN : selectedSpot.location}
                 </span>
                 <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-wide">
-                  {selectedSpot.name}
+                  {language === 'bn' && selectedSpot.nameBN ? selectedSpot.nameBN : selectedSpot.name}
                 </h2>
               </div>
             </div>
@@ -201,7 +203,7 @@ const Bangladesh = () => {
             {/* Modal Body: Info & Live Map */}
             <div className="p-6 md:p-7">
               <p className="text-gray-600 text-sm mb-5 leading-relaxed font-medium">
-                {selectedSpot.description}
+                {language === 'bn' && selectedSpot.descriptionBN ? selectedSpot.descriptionBN : selectedSpot.description}
               </p>
 
               {/* Grid: 1st Column (Info), 2nd Column (Leaflet Map) */}
@@ -211,7 +213,7 @@ const Bangladesh = () => {
                   <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">🕒</div>
                     <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'সেরা সময়' : 'Best Time'}</h4>
+                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'সেরা সময়' : 'Best Time'}</h4>
                       <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.bestVisitingTime}</p>
                     </div>
                   </div>

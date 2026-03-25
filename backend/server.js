@@ -30,7 +30,6 @@ app.post('/api/chat', async (req, res) => {
     const targetLanguage = language === 'bn' ? 'Bengali' : 'English';
 
     const completion = await openai.chat.completions.create({
-      // ✅ তোমার খুঁজে বের করা লেটেস্ট ফ্রি মডেল আইডি
       model: "nvidia/nemotron-3-super-120b-a12b:free", 
       messages: [
         { 
@@ -52,7 +51,7 @@ app.post('/api/chat', async (req, res) => {
     console.error("❌ AI API Error Detail:", error.message);
     
     const fallbackMessage = language === 'bn' 
-      ? "দুঃখিত ভাই, জিনি এখন একটু ব্যস্ত। দয়া করে আবার মেসেজ দিন!" 
+      ? "দুঃখিত ভাই, জিনি এখন একটু ব্যস্ত। দয়া করে আবার মেসেজ দিন!" 
       : "I'm sorry, I'm a bit busy right now. Please message me again!";
     
     res.json({ reply: fallbackMessage });
@@ -60,11 +59,12 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // ==========================================
-// 🗺️ Map & Spots API Route
+// 🗺️ Map & Spots API Route (FOOLPROOF BANGLA INJECTION)
 // ==========================================
 app.get('/api/spots', async (req, res) => {
   try {
     let spots = await Spot.find();
+    
     if (spots.length === 0) {
       const defaultSpots = [
         {
@@ -87,8 +87,30 @@ app.get('/api/spots', async (req, res) => {
       await Spot.insertMany(defaultSpots);
       spots = await Spot.find();
     }
-    res.json(spots);
+
+    // 🟢 MAGIC INJECTION: ডাটাবেস এডিট করা ছাড়াই ডাটার সাথে বাংলা যোগ করে দিচ্ছি! 🟢
+    const spotsWithBangla = spots.map(spot => {
+      // Mongoose ডকুমেন্টকে সাধারণ অবজেক্টে কনভার্ট করা হচ্ছে
+      let spotData = spot.toObject ? spot.toObject() : spot;
+
+      if (spotData.name === 'Lalbagh Fort') {
+        spotData.nameBN = "লালবাগ কেল্লা";
+        spotData.locationBN = "পুরান ঢাকা";
+        spotData.descriptionBN = "১৭শ শতকের মোগল আমলের একটি অসম্পূর্ণ দুর্গ যা বুড়িগঙ্গা নদীর তীরে সগর্বে দাঁড়িয়ে আছে।";
+      } else if (spotData.name === "Cox's Bazar") {
+        spotData.nameBN = "কক্সবাজার";
+        spotData.locationBN = "চট্টগ্রাম";
+        spotData.descriptionBN = "বিশ্বের দীর্ঘতম প্রাকৃতিক সমুদ্র সৈকত (১২০ কিমি)। এর সোনালী বালি এবং সার্ফিং ঢেউয়ের জন্য বিখ্যাত।";
+      }
+
+      return spotData;
+    });
+
+    // বাংলা মেশানো ডাটা ফ্রন্টএন্ডে পাঠানো হচ্ছে
+    res.json(spotsWithBangla);
+
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server Error" });
   }
 });
