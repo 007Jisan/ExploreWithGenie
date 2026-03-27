@@ -15,7 +15,25 @@ const spotSchema = new mongoose.Schema({
   nearbyHotels: String,
   safetyTips: String,
   lat: Number,
-  lng: Number
+  lng: Number,
+  
+  // 👇 নতুন যোগ করা হলো: সুজনের Ratings & Reviews এর জন্য
+  reviews: [
+    {
+      userName: String,
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+        required: true
+      },
+      comment: String,
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ]
 });
 
 module.exports = mongoose.model('Spot', spotSchema);

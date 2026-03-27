@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useLanguage } from '../context/LanguageContext'; // 👈 শুধু এটা যোগ করলাম
+import { useLanguage } from '../context/LanguageContext'; 
 
 // Leaflet এর আইকন ফিক্স করার জন্য
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -21,17 +21,26 @@ const Bangladesh = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const { t, language } = useLanguage(); // 👈 ল্যাঙ্গুয়েজ স্টেট নিলাম
+  // 🟢 নতুন: রেটিং এবং কমেন্টের জন্য স্টেট 
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
 
-  // 🚀 ডাটাবেস থেকে ডাটা আনার API
+  const { t, language } = useLanguage(); 
+
+  // 🚀 ডাটাবেস থেকে স্পট এবং রিভিউ একসাথে ফেচ করা
+  const fetchSpots = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/spots');
+      const data = await res.json();
+      setPlaces(data);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching map data:", err);
+    }
+  };
+
   useEffect(() => {
-    fetch('http://localhost:5000/api/spots') 
-      .then(res => res.json())
-      .then(data => {
-        setPlaces(data);
-        setLoading(false);
-      })
-      .catch(err => console.error("Error fetching map data:", err));
+    fetchSpots();
   }, []);
 
   // Slider speed fixed to 2 seconds
@@ -50,16 +59,39 @@ const Bangladesh = () => {
   const closeModal = () => {
     setSelectedSpot(null);
     setCurrentImageIndex(0);
+    setComment(''); // মডাল বন্ধ হলে ফর্ম ক্লিয়ার হবে
   };
 
   const filteredPlaces = places.filter(place => 
     place.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    place.location.toLowerCase().includes(searchTerm.toLowerCase())
+    (place.location && place.location.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // 🔥 গুগল ম্যাপের একদম অফিশিয়াল লিংক
   const openDynamicRouteMap = (query) => {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+  };
+
+  // 🟢 নতুন: রিভিউ সাবমিট করার ফাংশন
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`http://localhost:5000/api/spots/${selectedSpot._id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: "Genie Tourist", rating, comment })
+      });
+      if (res.ok) {
+        alert(language === 'bn' ? 'রিভিউ সফলভাবে যোগ করা হয়েছে!' : 'Review submitted successfully!');
+        setComment(''); // ফর্ম ক্লিয়ার
+        fetchSpots(); // ব্যাকগ্রাউন্ডে নতুন ডাটা লোড
+        
+        // বর্তমান মডালে নতুন রিভিউ সাথে সাথে দেখানোর জন্য আপডেট
+        const updatedRes = await res.json();
+        setSelectedSpot(updatedRes.spot);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   if (loading) {
@@ -155,7 +187,7 @@ const Bangladesh = () => {
         </div>
       </div>
 
-      {/* 🔥 Premium Modal with Slider AND Inner Map */}
+      {/* 🔥 Premium Modal with Slider AND Inner Map AND Reviews */}
       {selectedSpot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6 transition-all duration-300 backdrop-blur-sm">
           
@@ -200,7 +232,7 @@ const Bangladesh = () => {
               </div>
             </div>
 
-            {/* Modal Body: Info & Live Map */}
+            {/* Modal Body: Info, Map & Reviews */}
             <div className="p-6 md:p-7">
               <p className="text-gray-600 text-sm mb-5 leading-relaxed font-medium">
                 {language === 'bn' && selectedSpot.descriptionBN ? selectedSpot.descriptionBN : selectedSpot.description}
@@ -253,6 +285,70 @@ const Bangladesh = () => {
                   </MapContainer>
                 </div>
                 
+              </div>
+
+              {/* ⭐ Ratings & Reviews Section (Sujan's Task) */}
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <h3 className="text-xl font-bold text-[#0a192f] mb-4 flex items-center gap-2">
+                  <span>💬</span> {language === 'bn' ? 'পর্যালোচকদের মতামত' : 'Tourist Reviews & Ratings'}
+                </h3>
+                
+                {/* Review Display Area */}
+                <div className="space-y-4 mb-6 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                  {selectedSpot.reviews && selectedSpot.reviews.length > 0 ? (
+                    selectedSpot.reviews.map((rev, idx) => (
+                      <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-bold text-sm text-gray-800 flex items-center gap-2">
+                            <div className="w-6 h-6 bg-[#0a192f] text-white rounded-full flex items-center justify-center text-[10px] uppercase">
+                              {rev.userName.charAt(0)}
+                            </div>
+                            {rev.userName}
+                          </span>
+                          <span className="text-yellow-400 text-sm tracking-widest">
+                            {"★".repeat(rev.rating)}{"☆".repeat(5-rev.rating)}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 text-sm pl-8 leading-relaxed">{rev.comment}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm italic text-center border border-blue-100">
+                      {language === 'bn' ? 'কোনো রিভিউ নেই। প্রথম রিভিউটি আপনি দিন! 🌟' : 'No reviews yet. Be the first to review! 🌟'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Review Submission Form */}
+                <form onSubmit={handleReviewSubmit} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <label className="text-sm font-bold text-[#0a192f]">{language === 'bn' ? 'আপনার রেটিং দিন:' : 'Rate your experience:'}</label>
+                    <select 
+                      value={rating} 
+                      onChange={(e) => setRating(e.target.value)} 
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50"
+                    >
+                      <option value="5">5 - Excellent 🌟</option>
+                      <option value="4">4 - Very Good ⭐</option>
+                      <option value="3">3 - Average 😐</option>
+                      <option value="2">2 - Poor 😕</option>
+                      <option value="1">1 - Terrible 😞</option>
+                    </select>
+                  </div>
+                  <textarea 
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder={language === 'bn' ? 'আপনার অভিজ্ঞতা বিস্তারিত লিখুন...' : 'Write your detailed experience...'} 
+                    required
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50 resize-none"
+                    rows="3"
+                  ></textarea>
+                  <div className="flex justify-end">
+                    <button type="submit" className="bg-[#0a192f] text-white text-sm font-bold py-2.5 px-6 rounded-lg hover:bg-[#00df9a] hover:text-[#0a192f] transition-all shadow-md active:scale-95">
+                      {language === 'bn' ? 'সাবমিট করুন' : 'Submit Review'}
+                    </button>
+                  </div>
+                </form>
               </div>
 
               {/* Modal Footer */}
