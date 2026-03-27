@@ -21,13 +21,19 @@ const Bangladesh = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // 🟢 নতুন: রেটিং এবং কমেন্টের জন্য স্টেট 
+  // রেটিং এবং কমেন্টের জন্য স্টেট 
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
+  // এশিতার Recommendation Engine এর জন্য স্টেট
+  const [budgetPref, setBudgetPref] = useState('Medium');
+  const [durationPref, setDurationPref] = useState('1-3 Days');
+  const [recommendedSpots, setRecommendedSpots] = useState([]);
+  const [showRecs, setShowRecs] = useState(false);
+  const [recLoading, setRecLoading] = useState(false);
+
   const { t, language } = useLanguage(); 
 
-  // 🚀 ডাটাবেস থেকে স্পট এবং রিভিউ একসাথে ফেচ করা
   const fetchSpots = async () => {
     try {
       const res = await fetch('http://localhost:5000/api/spots');
@@ -43,7 +49,6 @@ const Bangladesh = () => {
     fetchSpots();
   }, []);
 
-  // Slider speed fixed to 2 seconds
   useEffect(() => {
     let interval;
     if (selectedSpot && selectedSpot.sliderImages && selectedSpot.sliderImages.length > 1) {
@@ -59,7 +64,7 @@ const Bangladesh = () => {
   const closeModal = () => {
     setSelectedSpot(null);
     setCurrentImageIndex(0);
-    setComment(''); // মডাল বন্ধ হলে ফর্ম ক্লিয়ার হবে
+    setComment(''); 
   };
 
   const filteredPlaces = places.filter(place => 
@@ -68,10 +73,10 @@ const Bangladesh = () => {
   );
 
   const openDynamicRouteMap = (query) => {
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+    window.open(`https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(query)}`, '_blank');
   };
 
-  // 🟢 নতুন: রিভিউ সাবমিট করার ফাংশন
+  // 🟢 সুজনের Task: Backend এ Review Submit করা
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -82,16 +87,61 @@ const Bangladesh = () => {
       });
       if (res.ok) {
         alert(language === 'bn' ? 'রিভিউ সফলভাবে যোগ করা হয়েছে!' : 'Review submitted successfully!');
-        setComment(''); // ফর্ম ক্লিয়ার
-        fetchSpots(); // ব্যাকগ্রাউন্ডে নতুন ডাটা লোড
-        
-        // বর্তমান মডালে নতুন রিভিউ সাথে সাথে দেখানোর জন্য আপডেট
+        setComment(''); 
+        fetchSpots(); 
         const updatedRes = await res.json();
         setSelectedSpot(updatedRes.spot);
       }
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // 🟢 এশিতার Task: Backend এর সাথে Recommendation API Integration
+  const getRecommendations = async (e) => {
+    e.preventDefault();
+    setRecLoading(true);
+
+    try {
+      // ইউজারের আইডি লোকাল স্টোরেজ থেকে নেওয়া হচ্ছে (লগইন থাকলে), না থাকলে একটি ডেমো আইডি
+      const userId = localStorage.getItem('userId') || "65eabcd1234567890abcdef1"; 
+
+      // ১. ব্যাকএন্ডে ইউজারের পছন্দ (Preferences) সেভ করা
+      await fetch(`http://localhost:5000/api/users/${userId}/preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ budgetPreference: budgetPref, tripDurationPreference: durationPref })
+      });
+
+      // ২. ব্যাকএন্ড থেকে পার্সোনালাইজড রিকমেন্ডেশন ফেচ করা
+      const res = await fetch(`http://localhost:5000/api/users/${userId}/recommendations`);
+
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendedSpots(data.slice(0, 3)); // সেরা ৩টি স্পট দেখাবে
+      } else {
+        // টেস্টিং এর সময় ডেমো ইউজারের কারণে ব্যাকএন্ড এরর দিলে লোকাল ফলব্যাক কাজ করবে
+        fallbackRecommendations();
+      }
+    } catch (error) {
+      console.error("Backend integration error:", error);
+      fallbackRecommendations();
+    } finally {
+      setRecLoading(false);
+    }
+  };
+
+  // 🛠️ Fallback: টেস্টিং এর সময় যদি ডাটাবেসে ইউজার না থাকে, তখন যাতে UI না ভাঙে
+  const fallbackRecommendations = () => {
+    let recs = places.filter(spot => {
+      let score = 0;
+      if (budgetPref === 'Low' && (spot.estimatedBudget.includes('500') || spot.estimatedBudget.includes('1000') || spot.estimatedBudget.includes('1500'))) score += 2;
+      if (budgetPref === 'Medium' && (spot.estimatedBudget.includes('3000') || spot.estimatedBudget.includes('4000') || spot.estimatedBudget.includes('5000'))) score += 2;
+      if (budgetPref === 'High' && (spot.estimatedBudget.includes('8000') || spot.estimatedBudget.includes('10000'))) score += 2;
+      return score > 0;
+    });
+    if (recs.length === 0) recs = places.slice(0, 3);
+    setRecommendedSpots(recs.slice(0, 3));
   };
 
   if (loading) {
@@ -108,7 +158,7 @@ const Bangladesh = () => {
     <div className="min-h-screen bg-[#f8fafc] py-16 relative font-sans">
       <div className="container mx-auto px-4 max-w-7xl">
         
-        {/* Clean Header - Professional Text */}
+        {/* Header */}
         <div className="text-center mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-[#0a192f] mb-4">
             {language === 'bn' ? 'সুন্দর বাংলাদেশ ঘুরে দেখুন' : 'Explore Beautiful Bangladesh'} <span className="text-[#00df9a]">🇧🇩</span>
@@ -119,6 +169,78 @@ const Bangladesh = () => {
               : 'Discover historical landmarks, breathtaking landscapes, and hidden gems across the country.'}
           </p>
           <div className="h-1.5 w-24 bg-[#00df9a] mx-auto rounded-full shadow-sm mb-8"></div>
+        </div>
+
+        {/* 🌟 Recommendation Engine Block */}
+        <div className="max-w-4xl mx-auto mb-10 bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-[#0a192f] flex items-center gap-2">
+                <span>✨</span> {language === 'bn' ? 'আপনার জন্য স্পেশাল সাজেশন' : 'Personalized Recommendations'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {language === 'bn' ? 'বাজেট এবং সময় অনুযায়ী আপনার স্বপ্নের গন্তব্য খুঁজে নিন!' : 'Find your dream destination based on your budget and time!'}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowRecs(!showRecs)}
+              className="bg-[#00df9a] text-[#0a192f] px-6 py-2.5 rounded-xl font-bold hover:bg-[#00c98a] transition shadow-sm active:scale-95"
+            >
+              {showRecs ? (language === 'bn' ? 'বন্ধ করুন' : 'Close') : (language === 'bn' ? 'সাজেশন দেখুন' : 'Get Suggestions')}
+            </button>
+          </div>
+
+          {showRecs && (
+            <div className="mt-6 border-t border-gray-100 pt-6 animate-fadeInUp">
+              <form onSubmit={getRecommendations} className="flex flex-col sm:flex-row gap-4 mb-6">
+                <select
+                  value={budgetPref}
+                  onChange={(e) => setBudgetPref(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50 text-gray-700 font-medium"
+                >
+                  <option value="Low">{language === 'bn' ? 'কম বাজেট (৩০০০ ৳ এর নিচে)' : 'Low Budget (Under 3000 BDT)'}</option>
+                  <option value="Medium">{language === 'bn' ? 'মাঝারি বাজেট (৩০০০-৮০০০ ৳)' : 'Medium Budget (3000-8000 BDT)'}</option>
+                  <option value="High">{language === 'bn' ? 'প্রিমিয়াম বাজেট (৮০০০ ৳ এর উপরে)' : 'Premium Budget (8000+ BDT)'}</option>
+                </select>
+                <select
+                  value={durationPref}
+                  onChange={(e) => setDurationPref(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50 text-gray-700 font-medium"
+                >
+                  <option value="1 Day">{language === 'bn' ? '১ দিনের ট্রিপ' : 'Day Trip (1 Day)'}</option>
+                  <option value="1-3 Days">{language === 'bn' ? 'ছোট ছুটি (১-৩ দিন)' : 'Short Trip (1-3 Days)'}</option>
+                  <option value="4+ Days">{language === 'bn' ? 'লম্বা ট্যুর (৪+ দিন)' : 'Long Tour (4+ Days)'}</option>
+                </select>
+                <button
+                  type="submit"
+                  disabled={recLoading}
+                  className="bg-[#0a192f] text-white px-8 py-3 rounded-xl font-bold hover:bg-gray-800 transition shadow-md disabled:bg-gray-400"
+                >
+                  {recLoading ? (language === 'bn' ? 'খুঁজছি...' : 'Finding...') : (language === 'bn' ? 'খুঁজুন' : 'Find Magic')}
+                </button>
+              </form>
+
+              {recommendedSpots.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {recommendedSpots.map((place, idx) => (
+                    <div 
+                      key={idx} 
+                      className="bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg transition cursor-pointer group" 
+                      onClick={() => setSelectedSpot(place)}
+                    >
+                      <div className="h-32 overflow-hidden">
+                        <img src={place.mainImage} alt={place.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                      </div>
+                      <div className="p-4">
+                        <h4 className="font-bold text-[#0a192f] text-lg truncate">{language === 'bn' && place.nameBN ? place.nameBN : place.name}</h4>
+                        <p className="text-xs text-gray-500 mt-1 font-medium">📍 {language === 'bn' && place.locationBN ? place.locationBN : place.location}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 🔥 Filter / Search Bar */}
@@ -166,7 +288,7 @@ const Bangladesh = () => {
                       onClick={() => setSelectedSpot(place)}
                       className="flex-1 bg-[#0a192f] text-white text-sm font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-colors shadow-sm active:scale-95"
                     >
-                      {t('exploreBtn')}
+                      {language === 'bn' ? 'বিস্তারিত দেখুন' : 'Explore Spot'}
                     </button>
                     <button 
                       onClick={() => openDynamicRouteMap(place.name)}
@@ -253,7 +375,7 @@ const Bangladesh = () => {
                   <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">💰</div>
                     <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{t('budget')}</h4>
+                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'বাজেট' : 'Budget'}</h4>
                       <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.estimatedBudget}</p>
                     </div>
                   </div>
