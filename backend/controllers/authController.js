@@ -2,7 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 // ==========================================
-// ১. সাইনআপ লজিক (তোমার আগের কোড)
+// ১. সাইনআপ লজিক
 // ==========================================
 exports.signup = async (req, res) => {
   try {
@@ -14,8 +14,8 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create new user
-    user = new User({ name, email, password, role });
+    // Create new user (যদি role সিলেক্ট না করে, ডিফল্ট tourist হবে)
+    user = new User({ name, email, password, role: role || 'tourist' });
     await user.save();
 
     res.status(201).json({ message: 'User registered successfully ✅' });
@@ -26,7 +26,7 @@ exports.signup = async (req, res) => {
 };
 
 // ==========================================
-// ২. লগইন লজিক (তোমার আগের কোড)
+// ২. লগইন লজিক (🔥 পেলোড ফিক্স করা হয়েছে)
 // ==========================================
 exports.login = async (req, res) => {
   try {
@@ -42,8 +42,17 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid Credentials' });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
+    // 🔥 পেলোড স্ট্রাকচার মিডলওয়্যারের সাথে মেলানো হলো
+    const payload = { user: { id: user._id, role: user.role } };
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secretKey', { expiresIn: '1d' });
+    
+    // 🔥 ফ্রন্টএন্ডের Navbar যেন সহজেই role পেতে পারে তাই role আলাদা পাঠানো হলো
+    res.json({ 
+      token, 
+      role: user.role, 
+      userId: user._id,
+      user: { id: user._id, name: user.name, role: user.role } 
+    });
   } catch (err) {
     console.error("Login Error:", err.message);
     res.status(500).json({ message: 'Server Error during Login' });
@@ -51,11 +60,11 @@ exports.login = async (req, res) => {
 };
 
 // ==========================================
-// ৩. নতুন: প্রোফাইল দেখার লজিক (GET)
+// ৩. প্রোফাইল দেখার লজিক (GET)
 // ==========================================
 exports.getProfile = async (req, res) => {
   try {
-    // পাসওয়ার্ড বাদে ইউজারের বাকি সব ডাটা ডাটাবেস থেকে আনবে
+    // পাসওয়ার্ড বাদে ইউজারের বাকি সব ডাটা ডাটাবেস থেকে আনবে
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (err) {
@@ -65,7 +74,7 @@ exports.getProfile = async (req, res) => {
 };
 
 // ==========================================
-// ৪. নতুন: প্রোফাইল আপডেট/এডিট করার লজিক (PUT)
+// ৪. প্রোফাইল আপডেট/এডিট করার লজিক (PUT)
 // ==========================================
 exports.updateProfile = async (req, res) => {
   try {

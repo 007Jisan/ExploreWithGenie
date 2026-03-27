@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-// কন্ট্রোলার এবং মিডলওয়্যার ইম্পোর্ট করা হলো
 const { signup, login, getProfile, updateProfile } = require('../controllers/authController');
 const protect = require('../middleware/authMiddleware'); 
 
@@ -9,8 +8,9 @@ const protect = require('../middleware/authMiddleware');
 router.post('/signup', signup);
 router.post('/login', login);
 
-// প্রোফাইলের জন্য নতুন রাউটগুলো (protect মিডলওয়্যার সহ)
+// প্রোফাইলের জন্য রাউটগুলো
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 
+// 🟢 এই লাইনটা মিসিং থাকার কারণেই সার্ভার ক্র্যাশ করছিল!
 module.exports = router;

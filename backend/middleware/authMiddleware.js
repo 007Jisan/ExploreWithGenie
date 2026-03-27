@@ -1,22 +1,22 @@
 const jwt = require('jsonwebtoken');
 
-const protect = (req, res, next) => {
-  let token = req.header('Authorization');
+const protect = async (req, res, next) => {
+  let token;
 
-  if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
+      req.user = decoded.user;
+      next(); 
+    } catch (error) {
+      console.error('Auth Middleware Error:', error.message);
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
   }
 
-  try {
-    if (token.startsWith('Bearer ')) {
-      token = token.slice(7, token.length).trimLeft();
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'jisan_secret_123');
-    req.user = decoded; 
-    next();
-  } catch (err) {
-    res.status(401).json({ message: 'Token is not valid' });
+  if (!token) {
+    return res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 

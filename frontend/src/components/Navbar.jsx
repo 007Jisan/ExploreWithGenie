@@ -6,12 +6,15 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { language, changeLanguage } = useLanguage(); 
   const token = localStorage.getItem('token');
+  
+  // 🟢 ইউজারের রোল বের করা এবং ছোট হাতের অক্ষরে (lowercase) কনভার্ট করা যাতে স্পেলিং ভুল না হয়
+  const userRole = (localStorage.getItem('role') || 'tourist').toLowerCase(); 
+  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const toggleLanguage = () => {
     const newLang = language === 'en' ? 'bn' : 'en';
     changeLanguage(newLang); 
-    // 🚀 রিলোড সরিয়ে দিয়েছি, এখন ম্যাজিকের মতো ডায়নামিক চেঞ্জ হবে!
   };
 
   const handleLogout = () => {
@@ -62,16 +65,34 @@ const Navbar = () => {
             </div>
           ) : (
             <div className="relative">
-              <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="h-10 w-10 rounded-full bg-[#006a4e] text-white flex items-center justify-center hover:bg-[#005a3e] transition-colors">
+              <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="h-10 w-10 rounded-full bg-[#00df9a] text-[#0a192f] flex items-center justify-center hover:bg-white transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
               </button>
+              
+              {/* 🟢 Role-based Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-2xl py-2 text-gray-700">
-                  <Link to="/profile" className="block px-4 py-2 hover:bg-gray-100 font-medium">
-                    {language === 'bn' ? 'আমার প্রোফাইল' : 'My Profile'}
+                <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-2xl py-2 text-gray-700 border border-gray-100">
+                  
+                  {/* Admin Link */}
+                  {userRole === 'admin' && (
+                    <Link to="/admin" className="block px-4 py-3 hover:bg-teal-50 font-bold text-teal-700 border-b border-gray-100">
+                      🛡️ {language === 'bn' ? 'অ্যাডমিন প্যানেল' : 'Admin Panel'}
+                    </Link>
+                  )}
+
+                  {/* Agency Link */}
+                  {userRole === 'agency' && (
+                    <Link to="/agency-login" className="block px-4 py-3 hover:bg-blue-50 font-bold text-blue-700 border-b border-gray-100">
+                      🏢 {language === 'bn' ? 'এজেন্সি ড্যাশবোর্ড' : 'Agency Dashboard'}
+                    </Link>
+                  )}
+
+                  <Link to="/profile" className="block px-4 py-3 hover:bg-gray-50 font-medium border-b border-gray-100">
+                    👤 {language === 'bn' ? 'আমার প্রোফাইল' : 'My Profile'}
                   </Link>
-                  <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 font-medium">
-                    {language === 'bn' ? 'লগআউট' : 'Log Out'}
+
+                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-medium">
+                    🚪 {language === 'bn' ? 'লগআউট' : 'Log Out'}
                   </button>
                 </div>
               )}
