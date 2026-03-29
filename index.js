@@ -1,17 +1,33 @@
 const express = require("express");
+const mongoose = require("mongoose");
+
 const app = express();
 
-// Home route
+// middleware (good practice)
+app.use(express.json());
+
+// MongoDB connection
+mongoose.connect("mongodb://127.0.0.1:27017/explorewithgenie")
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.log("DB error:", err));
+
+// routes
 app.get("/", (req, res) => {
-  res.send("Server running");
+  res.status(200).json({ message: "Server running" });
 });
 
-// About route
 app.get("/about", (req, res) => {
-  res.send("About page");
+  res.status(200).json({ message: "About page" });
 });
 
-// Start server
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+// 404 handler (important improvement)
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
 });
+
+// server
+const PORT = 3000;
+
+app.listen(PORT, () => {
+  console.log(Server running on port ${PORT});
+})
