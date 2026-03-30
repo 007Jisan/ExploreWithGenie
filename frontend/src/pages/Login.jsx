@@ -8,40 +8,33 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorMessage(''); 
+    setErrorMessage('');
 
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ টোকেন এবং ইউজারের রোল localStorage-এ সেভ করা হচ্ছে
         localStorage.setItem('token', data.token);
-        localStorage.setItem('role', data.user.role); 
+        localStorage.setItem('role', data.user.role);
+        localStorage.setItem('userId', data.user.id);
 
-        alert('Login Successful! 🧞‍♂️');
-
-        // 🔥 FIX: navigate এবং reload এর বদলে সরাসরি href ব্যবহার করা হলো
         if (data.user.role === 'admin') {
           window.location.href = '/admin';
         } else if (data.user.role === 'agency') {
-          window.location.href = '/agency-login';
+          window.location.href = '/agency-dashboard';
         } else {
-          window.location.href = '/'; // সাধারণ ট্যুরিস্ট
+          window.location.href = '/';
         }
-        
       } else {
         setErrorMessage(data.message || 'Login failed! Please check your credentials.');
       }
     } catch (error) {
-      console.error('Login Error:', error);
       setErrorMessage('Server error. Please try again later.');
     }
   };
@@ -49,7 +42,6 @@ const Login = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4 py-12">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-        
         <div className="text-center mb-8">
           <h2 className="text-3xl font-extrabold text-[#0a192f]">Welcome Back</h2>
           <p className="text-gray-500 mt-2">Login to your ExploreWithGenie account</p>
@@ -64,8 +56,8 @@ const Login = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -76,20 +68,17 @@ const Login = () => {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00df9a] focus:border-[#0a192f] outline-none transition-all bg-gray-50 focus:bg-white"
-              placeholder="••••••••"
+              placeholder="********"
             />
           </div>
 
-          <button 
-            type="submit"
-            className="w-full bg-[#0a192f] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#00df9a] hover:text-[#0a192f] transition-all duration-300 transform active:scale-95 shadow-md"
-          >
+          <button type="submit" className="w-full bg-[#0a192f] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#00df9a] hover:text-[#0a192f] transition-all duration-300 transform active:scale-95 shadow-md">
             Log In
           </button>
         </form>
@@ -102,7 +91,6 @@ const Login = () => {
             </Link>
           </p>
         </div>
-
       </div>
     </div>
   );

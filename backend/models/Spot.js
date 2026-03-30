@@ -1,39 +1,53 @@
 const mongoose = require('mongoose');
 
 const spotSchema = new mongoose.Schema({
-  name: String,
-  nameBN: String, // 👈 বাংলার জন্য
-  mainImage: String,
+  name: { type: String, required: true },
+  nameBN: String, 
+  mainImage: { type: String, required: true },
   sliderImages: [String],
-  location: String,
-  locationBN: String, // 👈 বাংলার জন্য
+  category: {
+    type: String,
+    enum: ['Natural', 'Historical', 'Popular'],
+    default: 'Popular',
+  },
+  location: { type: String, required: true },
+  locationBN: String, 
   mapQuery: String,
-  description: String,
-  descriptionBN: String, // 👈 বাংলার জন্য
+  description: { type: String, required: true },
+  descriptionBN: String, 
   bestVisitingTime: String,
   estimatedBudget: String,
   nearbyHotels: String,
   safetyTips: String,
-  lat: Number,
-  lng: Number,
+  lat: { type: Number, required: true },
+  lng: { type: Number, required: true },
   
-  // 👇 নতুন যোগ করা হলো: সুজনের Ratings & Reviews এর জন্য
+  // 🔥 রিভিউ সেকশন (Sujan & Eshita Module)
   reviews: [
     {
-      userName: String,
+      user: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User',
+        required: true 
+      },
+      userName: { type: String, required: true },
       rating: {
         type: Number,
         min: 1,
         max: 5,
         required: true
       },
-      comment: String,
+      comment: { type: String, required: true },
+      date: { 
+        type: String, 
+        default: () => new Date().toLocaleDateString() // Function হিসেবে দিলে প্রতিবার নতুন তারিখ নিবে
+      },
       createdAt: {
         type: Date,
         default: Date.now
       }
     }
   ]
-});
+}, { timestamps: true }); // createdAt এবং updatedAt অটোমেটিক ট্র্যাক করবে
 
 module.exports = mongoose.model('Spot', spotSchema);
