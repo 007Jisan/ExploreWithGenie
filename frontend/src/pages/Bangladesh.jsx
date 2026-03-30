@@ -1,47 +1,100 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
-import { useLanguage } from '../context/LanguageContext'; 
+import 'leaflet/dist/leaflet.css';
+import { useLanguage } from '../context/LanguageContext';
+import Recommendation from '../components/Recommendation';
 
-// Leaflet এর আইকন ফিক্স করার জন্য
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-let DefaultIcon = L.icon({
+
+const defaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
-  iconAnchor: [12, 41]
+  iconAnchor: [12, 41],
 });
-L.Marker.prototype.options.icon = DefaultIcon;
+
+L.Marker.prototype.options.icon = defaultIcon;
+
+const fallbackCities = [
+  { name: 'Dhaka', lat: 23.8103, lng: 90.4125 },
+  { name: 'Chattogram', lat: 22.3569, lng: 91.7832 },
+  { name: 'Khulna', lat: 22.8456, lng: 89.5403 },
+  { name: 'Sylhet', lat: 24.8949, lng: 91.8687 },
+  { name: 'Rajshahi', lat: 24.3745, lng: 88.6042 },
+];
+
+const getShortDescription = (text = '') => {
+  if (text.length <= 78) return text;
+  return `${text.slice(0, 78).trim()}...`;
+};
+
+const getDistance = (lat1, lng1, lat2, lng2) => {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  return 2 * earthRadiusKm * Math.asin(Math.sqrt(a));
+};
 
 const Bangladesh = () => {
   const [places, setPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSpot, setSelectedSpot] = useState(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // রেটিং এবং কমেন্টের জন্য স্টেট 
-  const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [rating, setRating] = useState(5);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [userPreferences, setUserPreferences] = useState(null);
+  const { t } = useLanguage();
+  const currentUserId = localStorage.getItem('userId');
+  const token = localStorage.getItem('token');
 
-  // এশিতার Recommendation Engine এর জন্য স্টেট
-  const [budgetPref, setBudgetPref] = useState('Medium');
-  const [durationPref, setDurationPref] = useState('1-3 Days');
-  const [recommendedSpots, setRecommendedSpots] = useState([]);
-  const [showRecs, setShowRecs] = useState(false);
-  const [recLoading, setRecLoading] = useState(false);
+  const sortedSelectedReviews = [...(selectedSpot?.reviews || [])].sort(
+    (a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)
+  );
+  const existingUserReview = sortedSelectedReviews.find(
+    (review) => String(review.user) === String(currentUserId)
+  );
 
-  const { t, language } = useLanguage(); 
+  const upsertSelectedSpotReview = (incomingReview) => {
+    if (!incomingReview) return;
+
+    setSelectedSpot((prev) => {
+      if (!prev) return prev;
+
+      const reviews = Array.isArray(prev.reviews) ? [...prev.reviews] : [];
+      const existingIndex = reviews.findIndex(
+        (review) => String(review.user) === String(incomingReview.user)
+      );
+
+      if (existingIndex >= 0) {
+        reviews[existingIndex] = { ...reviews[existingIndex], ...incomingReview };
+      } else {
+        reviews.unshift(incomingReview);
+      }
+
+      return { ...prev, reviews };
+    });
+  };
 
   const fetchSpots = async () => {
     try {
       const res = await fetch('http://localhost:5000/api/spots');
       const data = await res.json();
       setPlaces(data);
-      setLoading(false);
     } catch (err) {
-      console.error("Error fetching map data:", err);
+      console.error('Error fetching spots:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,450 +103,403 @@ const Bangladesh = () => {
   }, []);
 
   useEffect(() => {
-    let interval;
-    if (selectedSpot && selectedSpot.sliderImages && selectedSpot.sliderImages.length > 1) {
-      interval = setInterval(() => {
-        setCurrentImageIndex((prevIndex) => 
-          (prevIndex + 1) % selectedSpot.sliderImages.length
-        );
-      }, 2000); 
+    if (existingUserReview) {
+      setRating(Number(existingUserReview.rating) || 5);
+      setComment(existingUserReview.comment || '');
+      return;
     }
-    return () => clearInterval(interval);
-  }, [selectedSpot]);
 
-  const closeModal = () => {
-    setSelectedSpot(null);
-    setCurrentImageIndex(0);
-    setComment(''); 
+    setRating(5);
+    setComment('');
+  }, [existingUserReview, selectedSpot?._id]);
+
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      if (!token) return;
+
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/profile', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setUserPreferences({
+            budgetPreference: data.budgetPreference,
+            tripDurationPreference: data.tripDurationPreference,
+            interests: data.interests,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load user preferences:', err);
+      }
+    };
+
+    fetchPreferences();
+  }, [token]);
+
+  const syncSelectedSpot = async (spotId) => {
+    if (!spotId) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/spots/${spotId}`);
+      if (!response.ok) return;
+      const latestSpot = await response.json();
+      setSelectedSpot(latestSpot);
+    } catch (err) {
+      console.error('Error syncing selected spot:', err);
+    }
   };
 
-  const filteredPlaces = places.filter(place => 
-    place.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (place.location && place.location.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const openDynamicRouteMap = (spot) => {
+    const destination = `${spot.name}, ${spot.location}, Bangladesh`;
+    const nearestCity = fallbackCities.reduce((closest, city) => {
+      if (!closest) return city;
+      const currentDistance = getDistance(spot.lat, spot.lng, city.lat, city.lng);
+      const closestDistance = getDistance(spot.lat, spot.lng, closest.lat, closest.lng);
+      return currentDistance < closestDistance ? city : closest;
+    }, null);
 
-  const openDynamicRouteMap = (query) => {
-    window.open(`https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(query)}`, '_blank');
+    const openGoogleDirections = (origin) => {
+      const params = new URLSearchParams({
+        api: '1',
+        destination,
+        travelmode: 'driving',
+      });
+
+      if (origin) {
+        params.set('origin', origin);
+      }
+
+      window.open(`https://www.google.com/maps/dir/?${params.toString()}`, '_blank');
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => openGoogleDirections(`${coords.latitude},${coords.longitude}`),
+        () => openGoogleDirections(nearestCity ? nearestCity.name : 'Dhaka'),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+      return;
+    }
+
+    openGoogleDirections(nearestCity ? nearestCity.name : 'Dhaka');
   };
 
-  // 🟢 সুজনের Task: Backend এ Review Submit করা
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
+    const token = localStorage.getItem('token');
+    setReviewError('');
+    setReviewSuccess('');
+
+    if (!token) {
+      setReviewError('Please login first to share your experience.');
+      return;
+    }
+
     try {
-      const res = await fetch(`http://localhost:5000/api/spots/${selectedSpot._id}/reviews`, {
+      const res = await fetch('http://localhost:5000/api/auth/review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName: "Genie Tourist", rating, comment })
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          spotId: selectedSpot?._id,
+          rating,
+          comment: comment.trim(),
+        }),
       });
+
+      const data = await res.json();
       if (res.ok) {
-        alert(language === 'bn' ? 'রিভিউ সফলভাবে যোগ করা হয়েছে!' : 'Review submitted successfully!');
-        setComment(''); 
-        fetchSpots(); 
-        const updatedRes = await res.json();
-        setSelectedSpot(updatedRes.spot);
+        upsertSelectedSpotReview(data.newReview);
+        setComment('');
+        setReviewSuccess(data.message || 'Review submitted successfully.');
+        fetchSpots();
+      } else {
+        setReviewError(data.message || 'Review submit failed.');
+        syncSelectedSpot(selectedSpot?._id);
       }
     } catch (err) {
-      console.error(err);
+      setReviewError('Could not connect to the server.');
     }
-  };
-
-  // 🟢 এশিতার Task: Backend এর সাথে Recommendation API Integration
-  const getRecommendations = async (e) => {
-    e.preventDefault();
-    setRecLoading(true);
-
-    try {
-      // ইউজারের আইডি লোকাল স্টোরেজ থেকে নেওয়া হচ্ছে (লগইন থাকলে), না থাকলে একটি ডেমো আইডি
-      const userId = localStorage.getItem('userId') || "65eabcd1234567890abcdef1"; 
-
-      // ১. ব্যাকএন্ডে ইউজারের পছন্দ (Preferences) সেভ করা
-      await fetch(`http://localhost:5000/api/users/${userId}/preferences`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ budgetPreference: budgetPref, tripDurationPreference: durationPref })
-      });
-
-      // ২. ব্যাকএন্ড থেকে পার্সোনালাইজড রিকমেন্ডেশন ফেচ করা
-      const res = await fetch(`http://localhost:5000/api/users/${userId}/recommendations`);
-
-      if (res.ok) {
-        const data = await res.json();
-        setRecommendedSpots(data.slice(0, 3)); // সেরা ৩টি স্পট দেখাবে
-      } else {
-        // টেস্টিং এর সময় ডেমো ইউজারের কারণে ব্যাকএন্ড এরর দিলে লোকাল ফলব্যাক কাজ করবে
-        fallbackRecommendations();
-      }
-    } catch (error) {
-      console.error("Backend integration error:", error);
-      fallbackRecommendations();
-    } finally {
-      setRecLoading(false);
-    }
-  };
-
-  // 🛠️ Fallback: টেস্টিং এর সময় যদি ডাটাবেসে ইউজার না থাকে, তখন যাতে UI না ভাঙে
-  const fallbackRecommendations = () => {
-    let recs = places.filter(spot => {
-      let score = 0;
-      if (budgetPref === 'Low' && (spot.estimatedBudget.includes('500') || spot.estimatedBudget.includes('1000') || spot.estimatedBudget.includes('1500'))) score += 2;
-      if (budgetPref === 'Medium' && (spot.estimatedBudget.includes('3000') || spot.estimatedBudget.includes('4000') || spot.estimatedBudget.includes('5000'))) score += 2;
-      if (budgetPref === 'High' && (spot.estimatedBudget.includes('8000') || spot.estimatedBudget.includes('10000'))) score += 2;
-      return score > 0;
-    });
-    if (recs.length === 0) recs = places.slice(0, 3);
-    setRecommendedSpots(recs.slice(0, 3));
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-[#f8fafc]">
-        <div className="text-2xl font-bold text-[#00df9a] animate-pulse">
-          {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading Destinations...'}
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f8fb]">
+        <div className="text-2xl font-extrabold text-[#12233c]">
+          {t('spotsLoading')}
         </div>
       </div>
     );
   }
 
+  const categories = [
+    { key: 'All', label: t('categoryAll') },
+    { key: 'Natural', label: t('categoryNatural') },
+    { key: 'Historical', label: t('categoryHistorical') },
+    { key: 'Popular', label: t('categoryPopular') },
+  ];
+  const filteredPlaces =
+    activeCategory === 'All'
+      ? places
+      : places.filter((place) => (place.category || 'Popular') === activeCategory);
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] py-16 relative font-sans">
-      <div className="container mx-auto px-4 max-w-7xl">
-        
-        {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-[#0a192f] mb-4">
-            {language === 'bn' ? 'সুন্দর বাংলাদেশ ঘুরে দেখুন' : 'Explore Beautiful Bangladesh'} <span className="text-[#00df9a]">🇧🇩</span>
+    <div className="min-h-screen bg-[#f7f8fb] pt-[112px] pb-20 font-sans">
+      <div className="max-w-[1280px] mx-auto px-6">
+        <div className="text-center pt-10 pb-16">
+          <h1 className="text-[52px] md:text-[64px] font-black text-[#12233c] tracking-[-0.04em] leading-none">
+            {t('spotsHeroTitle')} <span className="text-[#1dd7a7]">{t('spotsHeroSuffix')}</span>
           </h1>
-          <p className="text-gray-500 font-medium max-w-2xl mx-auto mb-6 text-lg">
-            {language === 'bn' 
-              ? 'ঐতিহাসিক নিদর্শন, শ্বাসরুদ্ধকর ল্যান্ডস্কেপ এবং দেশের লুকানো রত্নগুলো আবিষ্কার করুন।' 
-              : 'Discover historical landmarks, breathtaking landscapes, and hidden gems across the country.'}
+          <p className="max-w-[690px] mx-auto mt-5 text-[17px] md:text-[18px] text-[#66748a] leading-[1.7] font-semibold">
+            {t('spotsHeroSubtitle')}
           </p>
-          <div className="h-1.5 w-24 bg-[#00df9a] mx-auto rounded-full shadow-sm mb-8"></div>
+          <div className="w-[100px] h-[7px] bg-[#1dd7a7] rounded-full mx-auto mt-8" />
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+            {categories.map((category) => (
+              <button
+                key={category.key}
+                type="button"
+                onClick={() => setActiveCategory(category.key)}
+                className={`px-5 py-2.5 rounded-full text-sm font-black border transition-colors ${
+                  activeCategory === category.key
+                    ? 'bg-[#12233c] text-white border-[#12233c]'
+                    : 'bg-white text-[#12233c] border-[#dbe3ef] hover:border-[#12233c]'
+                }`}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* 🌟 Recommendation Engine Block */}
-        <div className="max-w-4xl mx-auto mb-10 bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-[#0a192f] flex items-center gap-2">
-                <span>✨</span> {language === 'bn' ? 'আপনার জন্য স্পেশাল সাজেশন' : 'Personalized Recommendations'}
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {language === 'bn' ? 'বাজেট এবং সময় অনুযায়ী আপনার স্বপ্নের গন্তব্য খুঁজে নিন!' : 'Find your dream destination based on your budget and time!'}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowRecs(!showRecs)}
-              className="bg-[#00df9a] text-[#0a192f] px-6 py-2.5 rounded-xl font-bold hover:bg-[#00c98a] transition shadow-sm active:scale-95"
+        <div className="mb-12">
+          <Recommendation initialPreferences={userPreferences || {}} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
+          {filteredPlaces.map((place) => (
+            <div
+              key={place._id}
+              className="bg-white rounded-[30px] overflow-hidden border border-[#edf1f7] shadow-[0_18px_48px_rgba(15,23,42,0.08)]"
             >
-              {showRecs ? (language === 'bn' ? 'বন্ধ করুন' : 'Close') : (language === 'bn' ? 'সাজেশন দেখুন' : 'Get Suggestions')}
-            </button>
-          </div>
-
-          {showRecs && (
-            <div className="mt-6 border-t border-gray-100 pt-6 animate-fadeInUp">
-              <form onSubmit={getRecommendations} className="flex flex-col sm:flex-row gap-4 mb-6">
-                <select
-                  value={budgetPref}
-                  onChange={(e) => setBudgetPref(e.target.value)}
-                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50 text-gray-700 font-medium"
-                >
-                  <option value="Low">{language === 'bn' ? 'কম বাজেট (৩০০০ ৳ এর নিচে)' : 'Low Budget (Under 3000 BDT)'}</option>
-                  <option value="Medium">{language === 'bn' ? 'মাঝারি বাজেট (৩০০০-৮০০০ ৳)' : 'Medium Budget (3000-8000 BDT)'}</option>
-                  <option value="High">{language === 'bn' ? 'প্রিমিয়াম বাজেট (৮০০০ ৳ এর উপরে)' : 'Premium Budget (8000+ BDT)'}</option>
-                </select>
-                <select
-                  value={durationPref}
-                  onChange={(e) => setDurationPref(e.target.value)}
-                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50 text-gray-700 font-medium"
-                >
-                  <option value="1 Day">{language === 'bn' ? '১ দিনের ট্রিপ' : 'Day Trip (1 Day)'}</option>
-                  <option value="1-3 Days">{language === 'bn' ? 'ছোট ছুটি (১-৩ দিন)' : 'Short Trip (1-3 Days)'}</option>
-                  <option value="4+ Days">{language === 'bn' ? 'লম্বা ট্যুর (৪+ দিন)' : 'Long Tour (4+ Days)'}</option>
-                </select>
-                <button
-                  type="submit"
-                  disabled={recLoading}
-                  className="bg-[#0a192f] text-white px-8 py-3 rounded-xl font-bold hover:bg-gray-800 transition shadow-md disabled:bg-gray-400"
-                >
-                  {recLoading ? (language === 'bn' ? 'খুঁজছি...' : 'Finding...') : (language === 'bn' ? 'খুঁজুন' : 'Find Magic')}
-                </button>
-              </form>
-
-              {recommendedSpots.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {recommendedSpots.map((place, idx) => (
-                    <div 
-                      key={idx} 
-                      className="bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg transition cursor-pointer group" 
-                      onClick={() => setSelectedSpot(place)}
-                    >
-                      <div className="h-32 overflow-hidden">
-                        <img src={place.mainImage} alt={place.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
-                      </div>
-                      <div className="p-4">
-                        <h4 className="font-bold text-[#0a192f] text-lg truncate">{language === 'bn' && place.nameBN ? place.nameBN : place.name}</h4>
-                        <p className="text-xs text-gray-500 mt-1 font-medium">📍 {language === 'bn' && place.locationBN ? place.locationBN : place.location}</p>
-                      </div>
-                    </div>
-                  ))}
+              <div className="relative h-[258px]">
+                <img src={place.mainImage} alt={place.name} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0f1f37]/80 via-transparent to-transparent" />
+                <div className="absolute top-5 left-5 bg-[#12233c]/90 text-white rounded-full px-4 py-2 text-[12px] font-black uppercase tracking-wide">
+                  {place.category || 'Popular'}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* 🔥 Filter / Search Bar */}
-        <div className="max-w-xl mx-auto mb-12">
-          <div className="relative">
-            <span className="absolute inset-y-0 left-4 flex items-center text-gray-400 text-xl">🔍</span>
-            <input
-              type="text"
-              placeholder={language === 'bn' ? 'স্পট বা লোকেশন দিয়ে খুঁজুন...' : 'Filter by spot name or location...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00df9a] shadow-sm text-gray-700 bg-white font-medium"
-            />
-          </div>
-        </div>
-
-        {/* Premium Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {filteredPlaces.length > 0 ? (
-            filteredPlaces.map((place, index) => (
-              <div key={index} className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-gray-100 flex flex-col hover:-translate-y-2">
-                
-                {/* Card Image */}
-                <div className="relative h-64 overflow-hidden bg-gray-100">
-                  <img src={place.mainImage} alt={place.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a192f]/80 via-transparent to-transparent opacity-90"></div>
-                  
-                  <div className="absolute top-4 right-4 bg-white/95 text-[#0a192f] text-xs font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5">
-                    <span className="text-red-500 text-sm">📍</span> {language === 'bn' && place.locationBN ? place.locationBN : place.location}
-                  </div>
-                  
-                  <h3 className="absolute bottom-4 left-5 text-2xl font-bold text-white tracking-wide">
-                    {language === 'bn' && place.nameBN ? place.nameBN : place.name}
-                  </h3>
+                <div className="absolute top-5 right-5 bg-white rounded-full px-5 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.12)] flex items-center gap-2 text-[14px] font-black text-[#12233c]">
+                  <span className="text-pink-500 text-[13px]">📍</span>
+                  <span>{place.location}</span>
                 </div>
-
-                {/* Card Content */}
-                <div className="p-6 flex flex-col flex-grow bg-white">
-                  <p className="text-gray-600 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">
-                    {language === 'bn' && place.descriptionBN ? place.descriptionBN : place.description}
-                  </p>
-
-                  <div className="mt-auto flex gap-3 pt-3 border-t border-gray-50">
-                    <button 
-                      onClick={() => setSelectedSpot(place)}
-                      className="flex-1 bg-[#0a192f] text-white text-sm font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-colors shadow-sm active:scale-95"
-                    >
-                      {language === 'bn' ? 'বিস্তারিত দেখুন' : 'Explore Spot'}
-                    </button>
-                    <button 
-                      onClick={() => openDynamicRouteMap(place.name)}
-                      className="flex-1 bg-green-50 text-green-700 border border-green-200 text-sm font-bold py-3.5 rounded-xl hover:bg-green-600 hover:text-white transition-colors flex items-center justify-center gap-2 shadow-sm active:scale-95"
-                    >
-                      🗺️ {language === 'bn' ? 'ম্যাপ' : 'Route Map'}
-                    </button>
-                  </div>
-                </div>
-
+                <h3 className="absolute bottom-5 left-5 text-white text-[26px] font-black tracking-tight">
+                  {place.name}
+                </h3>
               </div>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-10 text-gray-500 font-bold text-xl">
-              {language === 'bn' ? 'কিছু পাওয়া যায়নি 🕵️‍♂️' : 'No places found matching your search. 🕵️‍♂️'}
+
+              <div className="px-6 pt-6 pb-5">
+                <p className="text-[#516174] text-[15px] leading-8 min-h-[92px] font-semibold">
+                  {getShortDescription(place.description)}
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 mt-8">
+                  <button
+                    onClick={() => {
+                      setSelectedSpot(place);
+                      setComment('');
+                      setRating(5);
+                      setReviewError('');
+                      setReviewSuccess('');
+                    }}
+                    className="bg-[#12233c] text-white rounded-[16px] py-[15px] text-[16px] font-extrabold shadow-sm hover:bg-[#0d1a30] transition-colors"
+                  >
+                    {t('viewDetails')}
+                  </button>
+                  <button
+                    onClick={() => openDynamicRouteMap(place)}
+                    className="bg-[#f3fff9] text-[#12a97f] border border-[#c8f4e7] rounded-[16px] py-[15px] text-[16px] font-extrabold hover:bg-[#e8fff6] transition-colors"
+                  >
+                    {t('routeMap')}
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* 🔥 Premium Modal with Slider AND Inner Map AND Reviews */}
       {selectedSpot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6 transition-all duration-300 backdrop-blur-sm">
-          
-          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full flex flex-col overflow-hidden relative animate-fadeInUp max-h-[95vh] overflow-y-auto">
-            
-            {/* Modal Image Slider Header */}
-            <div className="relative h-48 sm:h-64 w-full flex-shrink-0 bg-gray-900">
-              {selectedSpot.sliderImages && selectedSpot.sliderImages.length > 0 ? (
-                <img 
-                  src={selectedSpot.sliderImages[currentImageIndex]} 
-                  alt={`${selectedSpot.name} slide ${currentImageIndex + 1}`} 
-                  className="w-full h-full object-cover transition-opacity duration-500 ease-in-out" 
-                />
-              ) : (
-                <img src={selectedSpot.mainImage} alt={selectedSpot.name} className="w-full h-full object-cover" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
-              
-              {selectedSpot.sliderImages && selectedSpot.sliderImages.length > 1 && (
-                <div className="absolute bottom-3 right-0 left-0 flex justify-center gap-1.5 z-10">
-                  {selectedSpot.sliderImages.map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={`h-1.5 rounded-full transition-all duration-500 ${i === currentImageIndex ? 'w-6 bg-[#00df9a]' : 'w-2 bg-white/50'}`}
-                    ></div>
-                  ))}
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-center justify-center px-4 py-8">
+          <div className="w-full max-w-[860px] max-h-[92vh] overflow-y-auto bg-white rounded-[24px] border border-[#e6ecf3] shadow-[0_30px_100px_rgba(15,23,42,0.35)] p-5 md:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1.1fr] gap-4 items-start">
+              <div className="space-y-4">
+                <div className="bg-white border border-[#eef2f7] rounded-[18px] px-5 py-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-2xl bg-[#f8fafc] flex items-center justify-center text-xl">🕒</div>
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-[#a0aec0]">{t('bestTime')}</p>
+                      <p className="text-[18px] font-black text-[#1e293b] mt-1">
+                        {selectedSpot.bestVisitingTime || 'Anytime'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              <button 
-                onClick={closeModal}
-                className="absolute top-4 right-4 bg-white/20 hover:bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center transition-all backdrop-blur-md text-sm font-bold z-20"
-              >✕</button>
-              
-              <div className="absolute bottom-6 left-6 z-10">
-                <span className="bg-[#00df9a] text-[#0a192f] text-[10px] font-bold px-2 py-0.5 rounded-md mb-2 inline-block uppercase tracking-wider">
-                  📍 {language === 'bn' && selectedSpot.locationBN ? selectedSpot.locationBN : selectedSpot.location}
-                </span>
-                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-wide">
-                  {language === 'bn' && selectedSpot.nameBN ? selectedSpot.nameBN : selectedSpot.name}
-                </h2>
+                <div className="bg-white border border-[#eef2f7] rounded-[18px] px-5 py-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-2xl bg-[#f8fafc] flex items-center justify-center text-xl">💰</div>
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-[#a0aec0]">{t('budget')}</p>
+                      <p className="text-[18px] font-black text-[#1e293b] mt-1">
+                        {selectedSpot.estimatedBudget || '300 BDT'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-[#eef2f7] rounded-[18px] px-5 py-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-2xl bg-[#f8fafc] flex items-center justify-center text-xl">🏨</div>
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-[#a0aec0]">{t('nearbyHotels')}</p>
+                      <p className="text-[18px] font-black text-[#1e293b] mt-1">{selectedSpot.nearbyHotels}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#fff8f8] border border-[#ffdede] rounded-[18px] px-5 py-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center text-xl">🛡️</div>
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-[#d94841]">{t('safetyNotice')}</p>
+                      <p className="text-[18px] font-black text-[#cf3f3f] mt-1">{selectedSpot.safetyTips}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[18px] overflow-hidden border border-[#e8edf5] h-[272px]">
+                <MapContainer
+                  center={[selectedSpot.lat, selectedSpot.lng]}
+                  zoom={13}
+                  scrollWheelZoom={false}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <Marker position={[selectedSpot.lat, selectedSpot.lng]}>
+                    <Popup>{selectedSpot.name}</Popup>
+                  </Marker>
+                </MapContainer>
               </div>
             </div>
 
-            {/* Modal Body: Info, Map & Reviews */}
-            <div className="p-6 md:p-7">
-              <p className="text-gray-600 text-sm mb-5 leading-relaxed font-medium">
-                {language === 'bn' && selectedSpot.descriptionBN ? selectedSpot.descriptionBN : selectedSpot.description}
-              </p>
+            <div className="mt-10">
+              <h3 className="text-[18px] md:text-[20px] font-black text-[#12233c] mb-5">
+                {t('reviewsTitle')}
+              </h3>
 
-              {/* Grid: 1st Column (Info), 2nd Column (Leaflet Map) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-2">
-                
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
-                    <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">🕒</div>
-                    <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'সেরা সময়' : 'Best Time'}</h4>
-                      <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.bestVisitingTime}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
-                    <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">💰</div>
-                    <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'বাজেট' : 'Budget'}</h4>
-                      <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.estimatedBudget}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
-                    <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">🏨</div>
-                    <div>
-                      <h4 className="font-bold text-gray-400 text-[10px] uppercase tracking-wider mb-0.5">{language === 'bn' ? 'কাছের হোটেল' : 'Nearby Hotels'}</h4>
-                      <p className="text-sm text-[#0a192f] font-bold mt-0.5">{selectedSpot.nearbyHotels}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3.5 bg-red-50/50 rounded-2xl border border-red-100 shadow-sm">
-                    <div className="text-2xl bg-white p-2.5 rounded-xl shadow-sm">🛡️</div>
-                    <div>
-                      <h4 className="font-bold text-red-900 text-xs uppercase tracking-wider mb-1">{language === 'bn' ? 'সতর্কতা' : 'Safety Notice'}</h4>
-                      <p className="text-sm text-red-700 font-bold leading-snug">{selectedSpot.safetyTips}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 🗺️ Live Leaflet Map Container */}
-                <div className="h-64 lg:h-full w-full rounded-2xl overflow-hidden border border-gray-200 relative z-0 shadow-sm">
-                  <MapContainer center={[selectedSpot.lat, selectedSpot.lng]} zoom={13} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <Marker position={[selectedSpot.lat, selectedSpot.lng]}>
-                      <Popup><b className="text-sm">{selectedSpot.name}</b></Popup>
-                    </Marker>
-                  </MapContainer>
-                </div>
-                
-              </div>
-
-              {/* ⭐ Ratings & Reviews Section (Sujan's Task) */}
-              <div className="mt-8 border-t border-gray-100 pt-6">
-                <h3 className="text-xl font-bold text-[#0a192f] mb-4 flex items-center gap-2">
-                  <span>💬</span> {language === 'bn' ? 'পর্যালোচকদের মতামত' : 'Tourist Reviews & Ratings'}
-                </h3>
-                
-                {/* Review Display Area */}
-                <div className="space-y-4 mb-6 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                  {selectedSpot.reviews && selectedSpot.reviews.length > 0 ? (
-                    selectedSpot.reviews.map((rev, idx) => (
-                      <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-bold text-sm text-gray-800 flex items-center gap-2">
-                            <div className="w-6 h-6 bg-[#0a192f] text-white rounded-full flex items-center justify-center text-[10px] uppercase">
-                              {rev.userName.charAt(0)}
-                            </div>
-                            {rev.userName}
-                          </span>
-                          <span className="text-yellow-400 text-sm tracking-widest">
-                            {"★".repeat(rev.rating)}{"☆".repeat(5-rev.rating)}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 text-sm pl-8 leading-relaxed">{rev.comment}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm italic text-center border border-blue-100">
-                      {language === 'bn' ? 'কোনো রিভিউ নেই। প্রথম রিভিউটি আপনি দিন! 🌟' : 'No reviews yet. Be the first to review! 🌟'}
-                    </div>
-                  )}
-                </div>
-
-                {/* Review Submission Form */}
-                <form onSubmit={handleReviewSubmit} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <label className="text-sm font-bold text-[#0a192f]">{language === 'bn' ? 'আপনার রেটিং দিন:' : 'Rate your experience:'}</label>
-                    <select 
-                      value={rating} 
-                      onChange={(e) => setRating(e.target.value)} 
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50"
+              <div className="space-y-4 mb-5">
+                {sortedSelectedReviews.length > 0 ? (
+                  sortedSelectedReviews.map((rev) => (
+                    <div
+                      key={rev._id || `${rev.user}-${rev.createdAt}`}
+                      className="border border-[#eef2f7] rounded-2xl px-4 py-4 bg-[#fafcff]"
                     >
-                      <option value="5">5 - Excellent 🌟</option>
-                      <option value="4">4 - Very Good ⭐</option>
-                      <option value="3">3 - Average 😐</option>
-                      <option value="2">2 - Poor 😕</option>
-                      <option value="1">1 - Terrible 😞</option>
-                    </select>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-[#12233c] text-white text-xs font-black flex items-center justify-center">
+                            {rev.userName?.charAt(0) || 'G'}
+                          </div>
+                          <p className="font-black text-[#12233c]">{rev.userName}</p>
+                        </div>
+                        <p className="text-[#fbbf24] text-sm">
+                          {'★'.repeat(rev.rating)}
+                          {'☆'.repeat(5 - rev.rating)}
+                        </p>
+                      </div>
+                      <p className="text-[#64748b] text-sm">{rev.comment}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="border border-dashed border-[#d9e2ef] rounded-2xl px-5 py-5 text-[#64748b] text-sm">
+                    {t('noReviews')}
                   </div>
-                  <textarea 
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder={language === 'bn' ? 'আপনার অভিজ্ঞতা বিস্তারিত লিখুন...' : 'Write your detailed experience...'} 
-                    required
-                    className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-[#00df9a] bg-gray-50 resize-none"
-                    rows="3"
-                  ></textarea>
-                  <div className="flex justify-end">
-                    <button type="submit" className="bg-[#0a192f] text-white text-sm font-bold py-2.5 px-6 rounded-lg hover:bg-[#00df9a] hover:text-[#0a192f] transition-all shadow-md active:scale-95">
-                      {language === 'bn' ? 'সাবমিট করুন' : 'Submit Review'}
-                    </button>
-                  </div>
-                </form>
+                )}
               </div>
 
-              {/* Modal Footer */}
-              <div className="mt-7 pt-5 border-t border-gray-100 flex flex-col sm:flex-row justify-end items-center gap-3">
-                <button 
-                  onClick={closeModal}
-                  className="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-                >
-                  {language === 'bn' ? 'বন্ধ করুন' : 'Close'}
-                </button>
-                <button 
-                  onClick={() => openDynamicRouteMap(selectedSpot.name)}
-                  className="w-full sm:w-auto px-7 py-3 rounded-xl text-sm font-bold text-[#0a192f] bg-[#00df9a] hover:bg-[#00c98a] transition-all flex gap-2 items-center justify-center shadow-md"
-                >
-                  <span>🗺️</span> {language === 'bn' ? 'ম্যাপ দেখুন' : 'Get Directions'}
-                </button>
-              </div>
-              
+              <form onSubmit={handleReviewSubmit} className="border border-[#e6ecf3] rounded-2xl p-4 md:p-5 bg-white shadow-sm">
+                {reviewSuccess && (
+                  <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                    {reviewSuccess}
+                  </div>
+                )}
+                {reviewError && (
+                  <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                    {reviewError}
+                  </div>
+                )}
+                {existingUserReview && (
+                  <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
+                    {t('alreadyReviewedSpot')}
+                  </div>
+                )}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                  <label className="text-[15px] font-black text-[#12233c]">{t('reviewExperience')}</label>
+                  <select
+                    value={rating}
+                    onChange={(e) => setRating(Number(e.target.value))}
+                    className="w-full sm:w-[170px] border border-[#dbe3ef] rounded-xl px-3 py-2 text-sm font-semibold text-[#1e293b] outline-none"
+                  >
+                    <option value={5}>5 - Excellent</option>
+                    <option value={4}>4 - Very Good</option>
+                    <option value={3}>3 - Good</option>
+                    <option value={2}>2 - Fair</option>
+                    <option value={1}>1 - Poor</option>
+                  </select>
+                </div>
+
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="It's recommended"
+                  required
+                  rows="4"
+                  className="w-full border border-[#dbe3ef] rounded-xl px-4 py-3 text-sm text-[#334155] outline-none resize-none"
+                />
+
+                <div className="flex justify-end mt-4">
+                  <button
+                    type="submit"
+                    className="px-7 py-3 rounded-xl bg-[#18d6a5] text-[#0f213c] font-extrabold text-sm hover:bg-[#13c79a]"
+                  >
+                    {existingUserReview ? t('updateReview') : t('submitReview')}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="border-t border-[#eef2f7] mt-6 pt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedSpot(null)}
+                className="px-8 py-3 rounded-xl bg-[#f1f5f9] text-[#475569] font-extrabold text-sm hover:bg-[#e2e8f0]"
+              >
+                {t('close')}
+              </button>
+              <button
+                type="button"
+                onClick={() => openDynamicRouteMap(selectedSpot)}
+                className="px-8 py-3 rounded-xl bg-[#18d6a5] text-[#0f213c] font-extrabold text-sm hover:bg-[#14c79a]"
+              >
+                🗺 {t('getDirections')}
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

@@ -1,84 +1,179 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useLanguage } from '../context/LanguageContext';
 
-const Recommendation = () => {
-  const [budget, setBudget] = useState('Medium');
-  const [duration, setDuration] = useState('1-3 Days');
+const Recommendation = ({ initialPreferences = {} }) => {
+  const token = localStorage.getItem('token');
+  const { t } = useLanguage();
+  const [preferences, setPreferences] = useState({
+    budgetPreference: initialPreferences.budgetPreference || 'Medium',
+    tripDurationPreference: initialPreferences.tripDurationPreference || '1-3 Days',
+    interests:
+      Array.isArray(initialPreferences.interests) && initialPreferences.interests.length > 0
+        ? initialPreferences.interests.join(', ')
+        : 'History, Nature',
+  });
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  // ডেমো ইউজার আইডি (যেহেতু অথেনটিকেশন এখনো পুরোপুরি যুক্ত হয়নি)
-  const MOCK_USER_ID = "65eabcd1234567890abcdef1"; 
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
 
   const getRecommendations = async (e) => {
     e.preventDefault();
+    if (!token) {
+      setError('Please login first to get personalized recommendations.');
+      return;
+    }
+
     setLoading(true);
-    
+    setStatus('');
+    setError('');
+
     try {
-      // Step 1: ইউজারের পছন্দ সেভ করা
-      await fetch(`http://localhost:5000/api/users/${MOCK_USER_ID}/preferences`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ budgetPreference: budget, tripDurationPreference: duration })
+      const saveRes = await fetch('http://localhost:5000/api/auth/preferences', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          budgetPreference: preferences.budgetPreference,
+          tripDurationPreference: preferences.tripDurationPreference,
+          interests: preferences.interests
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
+        }),
       });
 
-      // Step 2: রিকমেন্ডেশন ফেচ করা
-      const res = await fetch(`http://localhost:5000/api/users/${MOCK_USER_ID}/recommendations`);
-      const data = await res.json();
-      setRecommendations(data);
-    } catch (error) {
-      console.error('Recommendation fetch error:', error);
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        setError(saveData.message || 'Could not save travel preferences.');
+        setLoading(false);
+        return;
+      }
+
+      const recommendationRes = await fetch('http://localhost:5000/api/auth/recommendations', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const recommendationData = await recommendationRes.json();
+
+      if (recommendationRes.ok) {
+        setRecommendations(recommendationData);
+        setStatus(t('recommendationUpdated'));
+      } else {
+        setError(recommendationData.message || 'Failed to load recommendations.');
+      }
+    } catch (errorValue) {
+      setError('Recommendation service is unavailable right now.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bg-gradient-to-r from-teal-50 to-blue-50 p-8 rounded-xl my-10 shadow-sm">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-800">Genie's Recommendations</h2>
-        <p className="text-gray-600 mt-2">Tell us your preference, we will find the perfect spot for you!</p>
+    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl p-6 md:p-8">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-black text-[#0a192f]">{t('recommendationTitle')}</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            {t('recommendationSubtitle')}
+          </p>
+        </div>
       </div>
 
-      <form onSubmit={getRecommendations} className="flex flex-col md:flex-row gap-4 justify-center items-center mb-8">
-        <select 
-          value={budget} 
-          onChange={(e) => setBudget(e.target.value)}
-          className="p-3 border rounded-lg w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-teal-500"
-        >
-          <option value="Low">Low Budget (Under 3000 BDT)</option>
-          <option value="Medium">Medium Budget (3000-8000 BDT)</option>
-          <option value="High">Premium Budget (Above 8000 BDT)</option>
-        </select>
+      <form onSubmit={getRecommendations} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_2fr_auto] gap-4 items-end">
+        <div>
+          <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+            {t('budgetPreference')}
+          </label>
+          <select
+            value={preferences.budgetPreference}
+            onChange={(e) =>
+              setPreferences((prev) => ({ ...prev, budgetPreference: e.target.value }))
+            }
+            className="w-full p-4 bg-slate-50 rounded-xl outline-none border border-slate-200 text-sm font-bold"
+          >
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
 
-        <select 
-          value={duration} 
-          onChange={(e) => setDuration(e.target.value)}
-          className="p-3 border rounded-lg w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-teal-500"
-        >
-          <option value="1 Day">Day Trip (1 Day)</option>
-          <option value="1-3 Days">Short Trip (1-3 Days)</option>
-          <option value="4+ Days">Long Vacation (4+ Days)</option>
-        </select>
+        <div>
+          <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+            {t('tripDuration')}
+          </label>
+          <select
+            value={preferences.tripDurationPreference}
+            onChange={(e) =>
+              setPreferences((prev) => ({ ...prev, tripDurationPreference: e.target.value }))
+            }
+            className="w-full p-4 bg-slate-50 rounded-xl outline-none border border-slate-200 text-sm font-bold"
+          >
+            <option value="1 Day">1 Day</option>
+            <option value="1-3 Days">1-3 Days</option>
+            <option value="4+ Days">4+ Days</option>
+          </select>
+        </div>
 
-        <button 
-          type="submit" 
+        <div>
+          <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+            {t('travelInterests')}
+          </label>
+          <input
+            type="text"
+            value={preferences.interests}
+            onChange={(e) => setPreferences((prev) => ({ ...prev, interests: e.target.value }))}
+            placeholder="History, Beach, Adventure"
+            className="w-full p-4 bg-slate-50 rounded-xl outline-none border border-slate-200 text-sm font-bold"
+          />
+        </div>
+
+        <button
+          type="submit"
           disabled={loading}
-          className="bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition"
+          className="bg-[#00df9a] text-[#0a192f] px-6 py-4 rounded-xl font-black text-sm disabled:opacity-60"
         >
-          {loading ? 'Finding Magic...' : 'Inspire Me 🧞‍♂️'}
+          {loading ? t('finding') : t('getMatches')}
         </button>
       </form>
 
-      {/* Recommended Spots Display */}
+      {status && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          {status}
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {error}
+        </div>
+      )}
+
       {recommendations.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-6">
           {recommendations.map((spot) => (
-            <div key={spot._id} className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition">
-              <img src={spot.mainImage} alt={spot.name} className="w-full h-48 object-cover" />
-              <div className="p-4">
-                <h3 className="font-bold text-xl mb-1">{spot.name}</h3>
-                <p className="text-gray-500 text-sm mb-2">📍 {spot.location}</p>
-                <p className="text-gray-700 text-sm line-clamp-2">{spot.description}</p>
+            <div key={spot._id} className="bg-slate-50 rounded-[1.5rem] overflow-hidden border border-slate-200">
+              <img src={spot.mainImage} alt={spot.name} className="w-full h-44 object-cover" />
+              <div className="p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-black text-lg text-[#0a192f]">{spot.name}</h3>
+                  <span className="text-[11px] font-black text-[#00a36c] uppercase">
+                    {spot.category || 'Popular'}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 mt-2">{spot.location}</p>
+                <p className="text-sm text-slate-600 mt-3 line-clamp-3">{spot.description}</p>
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-sm font-black text-[#0a192f]">{spot.estimatedBudget}</span>
+                  <Link
+                    to={`/spots/${spot._id}`}
+                    className="text-sm font-black text-[#00a36c] hover:underline"
+                  >
+                    View Spot
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
