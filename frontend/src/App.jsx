@@ -1,38 +1,30 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// 👇 Context & AI Chatbot
 import { LanguageProvider } from './context/LanguageContext';
 import Chatbot from './components/Chatbot';
-
-// Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
-// Pages
 import Home from './pages/Home';
 import Bangladesh from './pages/Bangladesh';
-import Login from './pages/Login';   
-import Signup from './pages/Signup'; 
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
-import About from './pages/About'; 
+import About from './pages/About';
+import Leaderboard from './pages/Leaderboard';
+import SpotDetails from './pages/SpotDetails';
 
-// ==========================================
-// 🔒 PrivateRoute
-// ==========================================
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" replace />;
 };
 
-// ==========================================
-// 🛡️ RoleRoute
-// ==========================================
 const RoleRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('token');
-  const userRole = localStorage.getItem('role'); 
+  const userRole = localStorage.getItem('role');
 
   if (!token) return <Navigate to="/login" replace />;
   if (!allowedRoles.includes(userRole)) return <Navigate to="/" replace />;
@@ -42,49 +34,62 @@ const RoleRoute = ({ children, allowedRoles }) => {
 
 function App() {
   return (
-    // 🌍 LanguageProvider সবার উপরে থাকবে
     <LanguageProvider>
       <Router>
         <div className="App font-sans bg-gray-50 min-h-screen flex flex-col">
-          
-          {/* 🧭 Navbar কনটেক্সটের ভেতরে থাকায় এখন ল্যাঙ্গুয়েজ পাবে */}
           <Navbar />
-          
-          <main className="flex-grow pt-20"> 
+
+          <main className="flex-grow pt-20">
             <Routes>
-              {/* Public Routes */}
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
 
-              {/* Private Routes */}
-              <Route path="/country/bangladesh" element={<PrivateRoute><Bangladesh /></PrivateRoute>} />
-              <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-              
-              {/* Admin Route */}
-              <Route 
-                path="/admin" 
+              <Route
+                path="/country/bangladesh"
+                element={
+                  <PrivateRoute>
+                    <Bangladesh />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/spots/:id"
+                element={
+                  <PrivateRoute>
+                    <SpotDetails />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <PrivateRoute>
+                    <Profile />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin"
                 element={
                   <RoleRoute allowedRoles={['admin']}>
                     <AdminDashboard />
                   </RoleRoute>
-                } 
+                }
               />
-
-              {/* Agency Route */}
-              <Route 
-                path="/agency-login" 
+              <Route
+                path="/agency-dashboard"
                 element={
                   <RoleRoute allowedRoles={['agency']}>
                     <AgencyDashboard />
                   </RoleRoute>
-                } 
+                }
               />
             </Routes>
           </main>
 
-          {/* 🤖 Chatbot & 🦶 Footer */}
           <Chatbot />
           <Footer />
         </div>
