@@ -1,103 +1,169 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useLanguage } from '../context/LanguageContext'; 
+import { useLanguage } from '../context/LanguageContext';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { language, changeLanguage } = useLanguage(); 
+  const { language, changeLanguage, t } = useLanguage();
   const token = localStorage.getItem('token');
-  
-  // 🟢 ইউজারের রোল বের করা এবং ছোট হাতের অক্ষরে (lowercase) কনভার্ট করা যাতে স্পেলিং ভুল না হয়
-  const userRole = (localStorage.getItem('role') || 'tourist').toLowerCase(); 
-  
+  const userRole = (localStorage.getItem('role') || 'tourist').toLowerCase();
+  const [userData, setUserData] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const toggleLanguage = () => {
-    const newLang = language === 'en' ? 'bn' : 'en';
-    changeLanguage(newLang); 
+  const fetchUser = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/profile', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) setUserData(data);
+    } catch (err) {
+      console.error('Navbar sync error:', err);
+    }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchUser();
+    window.addEventListener('profile-updated', fetchUser);
+    return () => window.removeEventListener('profile-updated', fetchUser);
+  }, [token]);
+
   const handleLogout = () => {
-    localStorage.removeItem('token'); 
-    localStorage.removeItem('role'); 
-    navigate('/login'); 
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userId');
+    setIsDropdownOpen(false);
+    navigate('/login');
+    window.location.reload();
+  };
+
+  const getProfileImage = () => {
+    if (userData?.profilePicture) {
+      return userData.profilePicture.startsWith('http')
+        ? userData.profilePicture
+        : `http://localhost:5000${userData.profilePicture}`;
+    }
+
+    return '';
+  };
+
+  const getInitials = () => {
+    const name = (userData?.name || 'Explorer').trim();
+    if (!name) return 'E';
+
+    const parts = name.split(/\s+/).slice(0, 2);
+    return parts.map((part) => part.charAt(0).toUpperCase()).join('');
   };
 
   return (
-    <nav className="fixed top-0 left-0 w-full h-20 z-50 bg-[#0a192f]/95 backdrop-blur-md border-b border-gray-800 shadow-xl flex items-center">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex items-center justify-between">
-        <div className="flex items-center">
-          <Link to="/" className="flex items-center group">
-            <div className="h-11 w-11 rounded-full overflow-hidden border-2 border-[#00df9a]/40 bg-white p-0.5">
-              <img className="h-full w-full rounded-full object-cover" src="https://as1.ftcdn.net/jpg/06/11/80/70/1000_F_611807025_qxIMBBULlsQFvTaDG5HKyujZTLV0xfOC.jpg" alt="Logo" />
+    <nav className="fixed top-0 left-0 w-full z-50 bg-[#16253c] shadow-[0_8px_30px_rgba(15,23,42,0.18)]">
+      <div className="max-w-[1280px] mx-auto h-[84px] px-8 flex items-center justify-between">
+        <div className="flex items-center gap-12">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-[54px] h-[54px] rounded-full bg-white border-[3px] border-[#9af2dd] flex items-center justify-center shadow-sm overflow-hidden">
+              <img
+                src="https://as1.ftcdn.net/jpg/06/11/80/70/1000_F_611807025_qxIMBBULlsQFvTaDG5HKyujZTLV0xfOC.jpg"
+                alt="Genie logo"
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="ml-3 font-bold text-white group-hover:text-[#00df9a] transition-colors">GENIE<span className="text-[#00df9a]">.</span></span>
+            <span className="text-white text-[20px] font-extrabold tracking-tight">
+              GENIE<span className="text-[#22d3a8]">.</span>
+            </span>
           </Link>
-          <div className="hidden md:flex items-center space-x-7 ml-10">
-            <Link to="/" className="text-gray-300 hover:text-[#00df9a] font-medium text-sm uppercase">
-              {language === 'bn' ? 'হোম' : 'Home'}
+
+          <div className="hidden md:flex items-center gap-10">
+            <Link to="/" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
+              {t('navHome')}
             </Link>
-            <Link to="/country/bangladesh" className="text-gray-300 hover:text-[#00df9a] font-medium text-sm uppercase">
-              {language === 'bn' ? 'গন্তব্য' : 'Destinations'}
+            <Link to="/country/bangladesh" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
+              {t('navDestinations')}
             </Link>
-            <Link to="/about" className="text-gray-300 hover:text-[#00df9a] font-medium text-sm uppercase">
-              {language === 'bn' ? 'আমাদের সম্পর্কে' : 'About'}
+            <Link to="/leaderboard" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
+              {t('navLeaderboard')}
+            </Link>
+            <Link to="/about" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
+              {t('navAbout')}
             </Link>
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={toggleLanguage} 
-            className="text-xs font-bold border border-[#00df9a]/50 text-[#00df9a] px-3 py-1.5 rounded-md hover:bg-[#00df9a] hover:text-[#0a192f] transition-all"
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => changeLanguage(language === 'en' ? 'bn' : 'en')}
+            className="px-3 py-2 rounded-full border border-white/10 text-white text-xs font-black uppercase tracking-widest bg-white/5"
           >
             {language === 'en' ? 'বাংলা' : 'English'}
           </button>
-          
-          {!token ? (
-            <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-gray-300 font-bold px-4 py-2 hover:text-[#00df9a]">
-                {language === 'bn' ? 'লগইন' : 'Log in'}
-              </Link>
-              <Link to="/signup" className="bg-[#00df9a] text-[#0a192f] px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
-                {language === 'bn' ? 'সাইন আপ' : 'Sign up'}
-              </Link>
-            </div>
-          ) : (
-            <div className="relative">
-              <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="h-10 w-10 rounded-full bg-[#00df9a] text-[#0a192f] flex items-center justify-center hover:bg-white transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-              </button>
-              
-              {/* 🟢 Role-based Dropdown Menu */}
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-2xl py-2 text-gray-700 border border-gray-100">
-                  
-                  {/* Admin Link */}
-                  {userRole === 'admin' && (
-                    <Link to="/admin" className="block px-4 py-3 hover:bg-teal-50 font-bold text-teal-700 border-b border-gray-100">
-                      🛡️ {language === 'bn' ? 'অ্যাডমিন প্যানেল' : 'Admin Panel'}
-                    </Link>
-                  )}
 
-                  {/* Agency Link */}
-                  {userRole === 'agency' && (
-                    <Link to="/agency-login" className="block px-4 py-3 hover:bg-blue-50 font-bold text-blue-700 border-b border-gray-100">
-                      🏢 {language === 'bn' ? 'এজেন্সি ড্যাশবোর্ড' : 'Agency Dashboard'}
-                    </Link>
-                  )}
+        {token ? (
+          <div className="relative">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-[44px] h-[44px] rounded-full bg-[#0b8b70] flex items-center justify-center overflow-hidden shadow-sm ring-2 ring-[#9af2dd]/30"
+            >
+              {getProfileImage() ? (
+                <img
+                  src={getProfileImage()}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <span
+                style={{ display: getProfileImage() ? 'none' : 'flex' }}
+                className="w-full h-full items-center justify-center text-white text-xs font-black tracking-wide bg-gradient-to-br from-[#14c79a] to-[#0b8b70]"
+              >
+                {getInitials()}
+              </span>
+            </button>
 
-                  <Link to="/profile" className="block px-4 py-3 hover:bg-gray-50 font-medium border-b border-gray-100">
-                    👤 {language === 'bn' ? 'আমার প্রোফাইল' : 'My Profile'}
-                  </Link>
-
-                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-medium">
-                    🚪 {language === 'bn' ? 'লগআউট' : 'Log Out'}
-                  </button>
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl py-2 text-gray-700 border border-gray-100">
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
+                  <p className="text-xs font-black text-[#0a192f] truncate">{userData?.name || 'Explorer'}</p>
+                  <p className="text-[10px] text-[#00b894] font-bold uppercase tracking-widest">{userRole}</p>
                 </div>
-              )}
-            </div>
-          )}
+
+                {userRole === 'admin' && (
+                  <Link to="/admin" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
+                    Admin Panel
+                  </Link>
+                )}
+
+                {userRole === 'agency' && (
+                  <Link to="/agency-dashboard" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
+                    Agency Dashboard
+                  </Link>
+                )}
+
+                <Link to="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
+                  My Profile
+                </Link>
+
+                <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-bold text-xs">
+                  Log Out
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <Link to="/login" className="text-white font-bold text-sm">
+              {t('login')}
+            </Link>
+            <Link to="/signup" className="bg-[#22d3a8] text-[#12233c] px-5 py-2 rounded-full font-bold text-sm">
+              {t('signup')}
+            </Link>
+          </>
+        )}
         </div>
       </div>
     </nav>

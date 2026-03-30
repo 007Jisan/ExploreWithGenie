@@ -1,95 +1,396 @@
 const User = require('../models/User');
+const Spot = require('../models/Spot');
+const Experience = require('../models/Experience');
 const jwt = require('jsonwebtoken');
 
-// ==========================================
-// ১. সাইনআপ লজিক
-// ==========================================
+const BADGE_RULES = [
+  { threshold: 30, badge: 'Bronze Traveler' },
+  { threshold: 60, badge: 'Silver Traveler' },
+  { threshold: 100, badge: 'Gold Traveler' },
+];
+
+const awardBadges = (user) => {
+  if (!Array.isArray(user.badges)) {
+    user.badges = [];
+  }
+
+  const awardedBadges = [];
+  BADGE_RULES.forEach(({ threshold, badge }) => {
+    if (user.points >= threshold && !user.badges.includes(badge)) {
+      user.badges.push(badge);
+      awardedBadges.push(badge);
+    }
+  });
+
+  return awardedBadges;
+};
+
+const parseBudgetValue = (budgetText = '') => {
+  const digits = String(budgetText).replace(/[^\d]/g, '');
+  return digits ? Number(digits) : null;
+};
+
+const getRecommendationScore = (spot, preferences) => {
+  let score = 0;
+  const budget = parseBudgetValue(spot.estimatedBudget);
+  const interests = Array.isArray(preferences.interests) ? preferences.interests : [];
+  const history = Array.isArray(preferences.searchHistory) ? preferences.searchHistory : [];
+  const textBlob = `${spot.name} ${spot.location} ${spot.description}`.toLowerCase();
+
+  if (preferences.budgetPreference === 'Low' && budget !== null && budget <= 3000) score += 3;
+  if (preferences.budgetPreference === 'Medium' && budget !== null && budget > 3000 && budget <= 7000) score += 3;
+  if (preferences.budgetPreference === 'High' && budget !== null && budget > 7000) score += 3;
+
+  if (preferences.tripDurationPreference === '1 Day' && budget !== null && budget <= 2500) score += 2;
+  if (preferences.tripDurationPreference === '1-3 Days' && budget !== null && budget <= 7000) score += 2;
+  if (preferences.tripDurationPreference === '4+ Days' && budget !== null && budget >= 5000) score += 2;
+
+  interests.forEach((interest) => {
+    if (textBlob.includes(String(interest).toLowerCase())) {
+      score += 2;
+    }
+  });
+
+  history.forEach((item) => {
+    const term = String(item).toLowerCase();
+    if (term && textBlob.includes(term)) {
+      score += 1;
+    }
+  });
+
+  if (Array.isArray(spot.reviews) && spot.reviews.length > 0) {
+    score += Math.min(spot.reviews.length, 5);
+  }
+
+  return score;
+};
+
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ message: 'User already exists with this email' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email and password are required.' });
     }
 
-    // Create new user (যদি role সিলেক্ট না করে, ডিফল্ট tourist হবে)
-    user = new User({ name, email, password, role: role || 'tourist' });
-    await user.save();
+    let user = await User.findOne({ email });
+    if (user) return res.status(400).json({ message: 'User already exists' });
 
-    res.status(201).json({ message: 'User registered successfully ✅' });
+    user = new User({
+      name,
+      email,
+      password,
+      role: role || 'tourist',
+      points: 0,
+      badges: [],
+    });
+
+    await user.save();
+    return res.status(201).json({ message: 'User registered successfully.' });
   } catch (err) {
-    console.error("Signup Error:", err.message);
-    res.status(500).json({ message: 'Server Error: Check if all fields are correct' });
+    return res.status(500).json({ message: 'Server Error during signup' });
   }
 };
 
-// ==========================================
-// ২. লগইন লজিক (🔥 পেলোড ফিক্স করা হয়েছে)
-// ==========================================
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid Credentials' });
-    }
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid Credentials' });
-    }
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    // 🔥 পেলোড স্ট্রাকচার মিডলওয়্যারের সাথে মেলানো হলো
-    const payload = { user: { id: user._id, role: user.role } };
-    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secretKey', { expiresIn: '1d' });
-    
-    // 🔥 ফ্রন্টএন্ডের Navbar যেন সহজেই role পেতে পারে তাই role আলাদা পাঠানো হলো
-    res.json({ 
-      token, 
-      role: user.role, 
-      userId: user._id,
-      user: { id: user._id, name: user.name, role: user.role } 
+    const payload = {
+      user: { id: user._id, name: user.name, role: user.role },
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET || 'secretKey', {
+      expiresIn: '1d',
+    });
+
+    return res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
     });
   } catch (err) {
-    console.error("Login Error:", err.message);
-    res.status(500).json({ message: 'Server Error during Login' });
+    return res.status(500).json({ message: 'Login Error' });
   }
 };
 
-// ==========================================
-// ৩. প্রোফাইল দেখার লজিক (GET)
-// ==========================================
 exports.getProfile = async (req, res) => {
   try {
-    // পাসওয়ার্ড বাদে ইউজারের বাকি সব ডাটা ডাটাবেস থেকে আনবে
     const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
+    return res.json(user);
   } catch (err) {
-    console.error("Profile Fetch Error:", err.message);
-    res.status(500).json({ message: 'Server Error' });
+    return res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// ==========================================
-// ৪. প্রোফাইল আপডেট/এডিট করার লজিক (PUT)
-// ==========================================
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, age, phone, address, bio } = req.body;
-    
-    // ডাটাবেসে ইউজারের ডাটা আপডেট করবে
-    const updatedUser = await User.findByIdAndUpdate(
+    const allowedFields = [
+      'name',
+      'age',
+      'phone',
+      'address',
+      'bio',
+      'budgetPreference',
+      'tripDurationPreference',
+      'interests',
+    ];
+
+    const updates = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+
+    if (req.body.searchHistory) {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+
+      const nextHistory = Array.isArray(user.searchHistory) ? [...user.searchHistory] : [];
+      const term = String(req.body.searchHistory).trim();
+      if (term) {
+        const withoutDuplicate = nextHistory.filter(
+          (item) => item.toLowerCase() !== term.toLowerCase()
+        );
+        updates.searchHistory = [term, ...withoutDuplicate].slice(0, 10);
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true }).select('-password');
+    return res.json(updatedUser);
+  } catch (err) {
+    return res.status(500).json({ message: 'Update Error' });
+  }
+};
+
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const user = await User.findByIdAndUpdate(
       req.user.id,
-      { $set: { name, age, phone, address, bio } },
-      { new: true, runValidators: true }
+      { profilePicture: `/uploads/${req.file.filename}` },
+      { new: true }
     ).select('-password');
 
-    res.json(updatedUser);
+    return res.json({ imageUrl: user.profilePicture, user });
   } catch (err) {
-    console.error("Profile Update Error:", err.message);
-    res.status(500).json({ message: 'Server Error during update' });
+    return res.status(500).json({ message: 'Upload Error' });
+  }
+};
+
+exports.getLeaderboard = async (req, res) => {
+  try {
+    const topUsers = await User.find({ role: 'tourist' }).select('-password').lean();
+    const spots = await Spot.find().select('reviews').lean();
+    const experiences = await Experience.find().select('user createdAt').lean();
+    const usersWithAgencyReviews = await User.find({ role: 'agency' })
+      .select('agencyReviews')
+      .lean();
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const monthlyReviewMap = new Map();
+
+    spots.forEach((spot) => {
+      (spot.reviews || []).forEach((review) => {
+        const createdAt = new Date(review.createdAt || review.date || Date.now());
+        if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
+
+        const key = String(review.user);
+        monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1);
+      });
+    });
+
+    usersWithAgencyReviews.forEach((agency) => {
+      (agency.agencyReviews || []).forEach((review) => {
+        const createdAt = new Date(review.createdAt || Date.now());
+        if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
+
+        const key = String(review.user);
+        monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1);
+      });
+    });
+
+    experiences.forEach((experience) => {
+      const createdAt = new Date(experience.createdAt || Date.now());
+      if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
+
+      const key = String(experience.user);
+      monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1.5);
+    });
+
+    const rankedUsers = topUsers
+      .map((user) => ({
+        ...user,
+        monthlyPoints: Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10),
+      }))
+      .filter((user) => user.role === 'tourist')
+      .sort((a, b) => {
+        if (b.monthlyPoints !== a.monthlyPoints) return b.monthlyPoints - a.monthlyPoints;
+        if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      })
+      .slice(0, 10);
+
+    return res.json(rankedUsers);
+  } catch (err) {
+    return res.status(500).json({ message: 'Leaderboard Error' });
+  }
+};
+
+exports.addPoints = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.points = (Number(user.points) || 0) + 10;
+    const newBadges = awardBadges(user);
+    await user.save();
+
+    return res.json({ totalPoints: user.points, newBadges });
+  } catch (err) {
+    return res.status(500).json({ message: 'Points Error' });
+  }
+};
+
+exports.addReviewAndPoints = async (req, res) => {
+  try {
+    const { spotId, rating, comment } = req.body;
+    const userId = req.user.id;
+    const parsedRating = Number(rating);
+
+    if (!spotId || !parsedRating || !comment || !comment.trim()) {
+      return res.status(400).json({ message: 'Spot, rating and comment are required.' });
+    }
+
+    const spot = await Spot.findById(spotId);
+    if (!spot) {
+      return res.status(404).json({ message: 'Spot not found in database.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    if (!Array.isArray(spot.reviews)) {
+      spot.reviews = [];
+    }
+
+    const existingReviewIndex = spot.reviews.findIndex(
+      (review) => String(review.user) === String(userId)
+    );
+
+    const reviewPayload = {
+      user: userId,
+      userName: user.name || 'Genie Traveler',
+      rating: parsedRating,
+      comment: comment.trim(),
+      date: new Date().toLocaleDateString(),
+      createdAt: new Date(),
+    };
+
+    let responseMessage = 'Review submitted! +10 XP earned.';
+    let awardedBadges = [];
+
+    if (existingReviewIndex >= 0) {
+      spot.reviews[existingReviewIndex].rating = reviewPayload.rating;
+      spot.reviews[existingReviewIndex].comment = reviewPayload.comment;
+      spot.reviews[existingReviewIndex].date = reviewPayload.date;
+      spot.reviews[existingReviewIndex].createdAt = reviewPayload.createdAt;
+      spot.reviews[existingReviewIndex].userName = reviewPayload.userName;
+      responseMessage = 'Your review has been updated successfully.';
+    } else {
+      spot.reviews.unshift(reviewPayload);
+      user.points = (Number(user.points) || 0) + 10;
+      awardedBadges = awardBadges(user);
+      if (awardedBadges.length) {
+        responseMessage = `Congrats! You earned: ${awardedBadges.join(', ')}`;
+      }
+    }
+
+    await spot.save();
+    await user.save();
+
+    const savedReview =
+      existingReviewIndex >= 0
+        ? spot.reviews[existingReviewIndex]
+        : spot.reviews[0];
+
+    return res.status(existingReviewIndex >= 0 ? 200 : 201).json({
+      message: responseMessage,
+      totalPoints: user.points,
+      awardedBadges,
+      newReview: savedReview,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: 'Internal Server Error',
+      error: err.message,
+    });
+  }
+};
+
+exports.savePreferences = async (req, res) => {
+  try {
+    const { budgetPreference, tripDurationPreference, interests } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (budgetPreference !== undefined) user.budgetPreference = budgetPreference;
+    if (tripDurationPreference !== undefined) user.tripDurationPreference = tripDurationPreference;
+    if (interests !== undefined) {
+      user.interests = Array.isArray(interests)
+        ? interests.filter(Boolean)
+        : String(interests)
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    await user.save();
+    return res.json({
+      message: 'Preferences saved successfully.',
+      preferences: {
+        budgetPreference: user.budgetPreference,
+        tripDurationPreference: user.tripDurationPreference,
+        interests: user.interests,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Preferences Error' });
+  }
+};
+
+exports.getRecommendations = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select(
+      'budgetPreference tripDurationPreference interests searchHistory'
+    );
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const spots = await Spot.find();
+    const rankedSpots = spots
+      .map((spot) => ({
+        ...spot.toObject(),
+        score: getRecommendationScore(spot, user),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    res.json(rankedSpots.slice(0, 6));
+  } catch (err) {
+    res.status(500).json({ message: 'Recommendation Error' });
   }
 };
