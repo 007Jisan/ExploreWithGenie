@@ -1,94 +1,183 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 const LanguageContext = createContext();
 
+const translations = {
+  en: {
+    navHome: 'Home',
+    navDestinations: 'Destinations',
+    navLeaderboard: 'Leaderboard',
+    navAbout: 'About',
+    login: 'Log in',
+    signup: 'Sign up',
+    exploreTitle: 'Where do you want to explore?',
+    available: 'Available Now',
+    comingSoon: 'Coming Soon',
+    loginTitle: 'Access Restricted!',
+    loginText: 'Please login first to explore Bangladesh!',
+    lockedTitle: 'is Locked!',
+    lockedText: 'This destination will be available soon.',
+    spotsLoading: 'Loading destinations...',
+    spotsHeroTitle: 'Explore Beautiful Bangladesh',
+    spotsHeroSuffix: 'BD',
+    spotsHeroSubtitle:
+      'Discover historical landmarks, breathtaking landscapes, and hidden gems across the country.',
+    viewDetails: 'View Details',
+    routeMap: 'Route Map',
+    reviewsTitle: 'Tourist Reviews & Ratings',
+    reviewExperience: 'Rate your experience:',
+    submitReview: 'Submit Review',
+    updateReview: 'Update Review',
+    alreadyReviewedSpot: 'You already reviewed this spot. You can update it anytime.',
+    noReviews: 'No reviews yet. Be the first traveler to share feedback.',
+    bestTime: 'Best Time',
+    budget: 'Budget',
+    nearbyHotels: 'Nearby Hotels',
+    safetyNotice: 'Safety Notice',
+    close: 'Close',
+    getDirections: 'Get Directions',
+    profileUpdated: 'Profile and travel preferences updated successfully.',
+    profilePictureUpdated: 'Profile picture updated successfully.',
+    recommendationTitle: 'Personalized Recommendations',
+    recommendationSubtitle:
+      'Match destinations to budget, trip duration, interests, and previous searches.',
+    getMatches: 'Get Matches',
+    finding: 'Finding...',
+    recommendationUpdated: 'Personalized recommendations updated successfully.',
+    budgetPreference: 'Budget Preference',
+    tripDuration: 'Trip Duration',
+    travelInterests: 'Travel Interests',
+    selectBudget: 'Select budget',
+    selectDuration: 'Select duration',
+    fullName: 'Full Name',
+    phoneNumber: 'Phone Number',
+    currentAddress: 'Current Address',
+    travelerBio: 'Traveler Bio',
+    saveRecords: 'Save Records',
+    editProfile: 'Edit Profile',
+    cancel: 'Cancel',
+    backToDestinations: 'Back to Destinations',
+    earnPointsPerReview: 'Earn 10 XP per review',
+    invokingGenie: 'Invoking Genie...',
+    interactiveRouteMap: 'Interactive Route Map',
+    safetyProtocols: 'Safety Protocols',
+    agencyPackages: 'Agency Packages',
+    availableCount: 'available',
+    hotelPricing: 'Hotel pricing',
+    askAgency: 'Ask the agency about this package...',
+    sendInquiry: 'Send Inquiry',
+    noAgencyPackages: 'No agency package is available for this location yet.',
+    feedback: 'Feedback',
+    reviewAlreadySubmitted: 'Review Already Submitted',
+    pleaseLoginReview: 'Please login first to share your experience.',
+    agencyReviewSubmitted: 'Agency review submitted successfully.',
+    agencyReviewTitle: 'Agency Reviews',
+    reviewThisAgency: 'Review this agency',
+    hostedBy: 'Hosted by',
+    agencyReviewPlaceholder: 'Share your experience with this agency...',
+    submitAgencyReview: 'Submit Agency Review',
+    chatbotWelcome: "Hello! I'm Genie. How can I help you plan your trip in Bangladesh?",
+    chatHeader: 'Genie Assistant',
+    chatPlaceholder: 'Ask me anything about your trip...',
+    thinking: 'Genie is thinking...',
+    errorMsg: "Sorry, I'm having trouble connecting right now.",
+    categoryAll: 'All',
+    categoryNatural: 'Natural',
+    categoryHistorical: 'Historical',
+    categoryPopular: 'Popular',
+  },
+  bn: {
+    navHome: 'হোম',
+    navDestinations: 'গন্তব্য',
+    navLeaderboard: 'লিডারবোর্ড',
+    navAbout: 'আমাদের সম্পর্কে',
+    login: 'লগইন',
+    signup: 'সাইন আপ',
+    exploreTitle: 'আপনি কোথায় ঘুরতে চান?',
+    available: 'এখনই দেখুন',
+    comingSoon: 'শীঘ্রই আসছে',
+    loginTitle: 'প্রবেশাধিকার সীমিত!',
+    loginText: 'বাংলাদেশ দেখতে চাইলে আগে লগইন করুন!',
+    lockedTitle: 'বন্ধ আছে!',
+    lockedText: 'এই গন্তব্য শীঘ্রই পাওয়া যাবে।',
+    spotsLoading: 'লোড হচ্ছে...',
+    spotsHeroTitle: 'ঘুরে দেখুন সুন্দর বাংলাদেশ',
+    spotsHeroSuffix: 'বিডি',
+    spotsHeroSubtitle: 'দেশজুড়ে ইতিহাস, প্রকৃতি আর জনপ্রিয় ভ্রমণস্থানের সেরা গন্তব্যগুলো আবিষ্কার করুন।',
+    viewDetails: 'বিস্তারিত দেখুন',
+    routeMap: 'রুট ম্যাপ',
+    reviewsTitle: 'পর্যটকদের রিভিউ ও রেটিং',
+    reviewExperience: 'আপনার অভিজ্ঞতা রেট করুন:',
+    submitReview: 'রিভিউ দিন',
+    updateReview: 'রিভিউ আপডেট করুন',
+    alreadyReviewedSpot: 'আপনি এই জায়গাটিতে আগে রিভিউ দিয়েছেন। চাইলে এখন আবার আপডেট করতে পারবেন।',
+    noReviews: 'এখনও কোনো রিভিউ নেই। প্রথম ভ্রমণকারী হিসেবে মতামত দিন।',
+    bestTime: 'সেরা সময়',
+    budget: 'বাজেট',
+    nearbyHotels: 'কাছাকাছি হোটেল',
+    safetyNotice: 'নিরাপত্তা বার্তা',
+    close: 'বন্ধ করুন',
+    getDirections: 'দিকনির্দেশনা',
+    profileUpdated: 'প্রোফাইল ও ভ্রমণ পছন্দ সফলভাবে আপডেট হয়েছে।',
+    profilePictureUpdated: 'প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে।',
+    recommendationTitle: 'পার্সোনালাইজড সাজেশন',
+    recommendationSubtitle: 'বাজেট, সময়, আগের সার্চ আর আগ্রহ অনুযায়ী উপযুক্ত গন্তব্য বেছে নিন।',
+    getMatches: 'সাজেশন নিন',
+    finding: 'খোঁজা হচ্ছে...',
+    recommendationUpdated: 'পার্সোনালাইজড সাজেশন আপডেট হয়েছে।',
+    budgetPreference: 'বাজেট পছন্দ',
+    tripDuration: 'ভ্রমণের সময়কাল',
+    travelInterests: 'ভ্রমণ আগ্রহ',
+    selectBudget: 'বাজেট বাছুন',
+    selectDuration: 'সময়কাল বাছুন',
+    fullName: 'পূর্ণ নাম',
+    phoneNumber: 'ফোন নম্বর',
+    currentAddress: 'বর্তমান ঠিকানা',
+    travelerBio: 'ভ্রমণ বায়ো',
+    saveRecords: 'সংরক্ষণ করুন',
+    editProfile: 'প্রোফাইল এডিট',
+    cancel: 'বাতিল',
+    backToDestinations: 'গন্তব্যে ফিরে যান',
+    earnPointsPerReview: 'প্রতি রিভিউতে ১০ এক্সপি',
+    invokingGenie: 'জিনি প্রস্তুত হচ্ছে...',
+    interactiveRouteMap: 'ইন্টারেক্টিভ রুট ম্যাপ',
+    safetyProtocols: 'নিরাপত্তা নির্দেশনা',
+    agencyPackages: 'এজেন্সি প্যাকেজ',
+    availableCount: 'টি রয়েছে',
+    hotelPricing: 'হোটেল খরচ',
+    askAgency: 'এই প্যাকেজ সম্পর্কে এজেন্সিকে জিজ্ঞাসা করুন...',
+    sendInquiry: 'ইনকোয়ারি পাঠান',
+    noAgencyPackages: 'এই লোকেশনের জন্য এখনো কোনো এজেন্সি প্যাকেজ নেই।',
+    feedback: 'মতামত',
+    reviewAlreadySubmitted: 'রিভিউ আগে দেওয়া হয়েছে',
+    pleaseLoginReview: 'রিভিউ দিতে আগে লগইন করুন।',
+    agencyReviewSubmitted: 'এজেন্সি রিভিউ সফলভাবে জমা হয়েছে।',
+    agencyReviewTitle: 'এজেন্সি রিভিউ',
+    reviewThisAgency: 'এই এজেন্সিকে রিভিউ দিন',
+    hostedBy: 'পরিচালনায়',
+    agencyReviewPlaceholder: 'এই এজেন্সি সম্পর্কে আপনার অভিজ্ঞতা লিখুন...',
+    submitAgencyReview: 'এজেন্সি রিভিউ দিন',
+    chatbotWelcome: 'হ্যালো! আমি জিনি। বাংলাদেশ ভ্রমণে আপনাকে কীভাবে সাহায্য করতে পারি?',
+    chatHeader: 'জিনি অ্যাসিস্ট্যান্ট',
+    chatPlaceholder: 'আপনার ভ্রমণ সম্পর্কে প্রশ্ন করুন...',
+    thinking: 'জিনি ভাবছে...',
+    errorMsg: 'দুঃখিত, এখন সংযোগ দেওয়া যাচ্ছে না।',
+    categoryAll: 'সব',
+    categoryNatural: 'প্রাকৃতিক',
+    categoryHistorical: 'ঐতিহাসিক',
+    categoryPopular: 'জনপ্রিয়',
+  },
+};
+
 export const LanguageProvider = ({ children }) => {
-  // শুরুতে লোকাল স্টোরেজ চেক করবে, না থাকলে ডিফল্ট 'en' সেট করবে
   const [language, setLanguage] = useState(localStorage.getItem('lang') || 'en');
 
-  // 📝 ডিকশনারি বা ট্রান্সলেশন ডেটা
-  const translations = {
-    en: {
-      // --- Navbar & General ---
-      navHome: "Home",
-      navDestinations: "Destinations",
-      navAbout: "About",
-      login: "Log in",
-      signup: "Sign up",
-
-      // --- Home Page ---
-      exploreTitle: "Where do you want to explore?",
-      available: "Available Now ✨",
-      comingSoon: "Coming Soon 🔒",
-      
-      // --- Bangladesh / Spots Page ---
-      spotsTitle: "Popular Tourist Spots in Bangladesh",
-      location: "Location",
-      budget: "Estimated Budget",
-      exploreBtn: "View Details",
-      aiGenieHint: "Ask Genie about this place!",
-
-      // --- Chatbot ---
-      chatHeader: "Genie Assistant",
-      chatPlaceholder: "Ask me anything about your trip...",
-      welcome: "Hello! I'm Genie. How can I help you plan your trip in Bangladesh?",
-      thinking: "Genie is thinking...",
-      errorMsg: "Sorry, I'm having trouble connecting right now.",
-
-      // --- SweetAlert / Pop-ups ---
-      loginTitle: "Access Restricted!",
-      loginText: "Please login first to explore Bangladesh! 🧞‍♂️",
-      lockedTitle: "is Locked! 🔒",
-      lockedText: "Our AI Genie is currently working on this destination. It will be available soon!",
-      goLogin: "Go to Login"
-    },
-    bn: {
-      // --- Navbar & General ---
-      navHome: "হোম",
-      navDestinations: "গন্তব্য",
-      navAbout: "আমাদের সম্পর্কে",
-      login: "লগইন",
-      signup: "সাইন আপ",
-
-      // --- Home Page ---
-      exploreTitle: "আপনি কোথায় ঘুরতে চান?",
-      available: "এখনই দেখুন ✨",
-      comingSoon: "শীঘ্রই আসছে 🔒",
-
-      // --- Bangladesh / Spots Page ---
-      spotsTitle: "বাংলাদেশের জনপ্রিয় পর্যটন কেন্দ্র",
-      location: "অবস্থান",
-      budget: "আনুমানিক বাজেট",
-      exploreBtn: "বিস্তারিত দেখুন",
-      aiGenieHint: "জিনিকে জিজ্ঞাসা করুন এই জায়গা সম্পর্কে!",
-
-      // --- Chatbot ---
-      chatHeader: "জিনি অ্যাসিস্ট্যান্ট",
-      chatPlaceholder: "আপনার ভ্রমণ সম্পর্কে জিজ্ঞাসা করুন...",
-      welcome: "হ্যালো! আমি জিনি। বাংলাদেশ ভ্রমণে আমি আপনাকে কীভাবে সাহায্য করতে পারি?",
-      thinking: "জিনি ভাবছে...",
-      errorMsg: "দুঃখিত, আমি এই মুহূর্তে কানেক্ট হতে পারছি না।",
-
-      // --- SweetAlert / Pop-ups ---
-      loginTitle: "প্রবেশাধিকার সীমিত!",
-      loginText: "বাংলাদেশ দেখতে চাইলে আগে লগইন করুন! 🧞‍♂️",
-      lockedTitle: "বন্ধ আছে! 🔒",
-      lockedText: "আমাদের এআই জিনি এই গন্তব্য নিয়ে কাজ করছে। সাথেই থাকুন!",
-      goLogin: "লগইন করুন"
-    }
-  };
-
-  // ✅ ল্যাঙ্গুয়েজ চেঞ্জ করার ফাংশন (Navbar এটি কল করবে)
   const changeLanguage = (newLang) => {
     setLanguage(newLang);
     localStorage.setItem('lang', newLang);
   };
 
-  // 🔍 ট্রান্সলেশন সহজে পাওয়ার জন্য হেল্পার ফাংশন
-  const t = (key) => {
-    // যদি কী খুঁজে না পায়, তবে সরাসরি কী-টাই রিটার্ন করবে (যাতে এরর না হয়)
-    return (translations[language] && translations[language][key]) || key;
-  };
+  const t = (key) => translations[language]?.[key] || translations.en[key] || key;
 
   return (
     <LanguageContext.Provider value={{ language, changeLanguage, t }}>
@@ -97,7 +186,6 @@ export const LanguageProvider = ({ children }) => {
   );
 };
 
-// কাস্টম হুক (সহজে ব্যবহার করার জন্য)
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {
