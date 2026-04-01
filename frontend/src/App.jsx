@@ -18,7 +18,7 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import About from './pages/About'; 
-import TourPackages from './pages/TourPackages'; // 🟢 নতুন পেজ ইম্পোর্ট করা হলো
+import TourPackages from './pages/TourPackages'; 
 
 // ==========================================
 // 🔒 PrivateRoute
@@ -43,12 +43,10 @@ const RoleRoute = ({ children, allowedRoles }) => {
 
 function App() {
   return (
-    // 🌍 LanguageProvider সবার উপরে থাকবে
     <LanguageProvider>
       <Router>
         <div className="App font-sans bg-gray-50 min-h-screen flex flex-col">
           
-          {/* 🧭 Navbar কনটেক্সটের ভেতরে থাকায় এখন ল্যাঙ্গুয়েজ পাবে */}
           <Navbar />
           
           <main className="flex-grow pt-20"> 
@@ -58,8 +56,6 @@ function App() {
               <Route path="/about" element={<About />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-              
-              {/* 🟢 এই রাউটটা মিসিং ছিল! */}
               <Route path="/packages" element={<TourPackages />} /> 
 
               {/* Private Routes */}
@@ -88,7 +84,6 @@ function App() {
             </Routes>
           </main>
 
-          {/* 🤖 Chatbot & 🦶 Footer */}
           <Chatbot />
           <Footer />
         </div>
