@@ -17,8 +17,22 @@ app.use(express.json());
 // 🟢 লোকাল ছবি সার্ভ করার জন্য স্ট্যাটিক ফোল্ডার
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
+// ==========================================
+// 🔐 Auth Routes
+// ==========================================
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
+
+// ==========================================
+// 🏢 Module 3: Agency Package Routes
+// ==========================================
+const packageRoutes = require('./routes/packageRoutes');
+app.use('/api/packages', packageRoutes);
+
+// 🟢 নতুন যোগ করা হলো: Booking Routes
+const bookingRoutes = require('./routes/bookingRoutes');
+app.use('/api/bookings', bookingRoutes);
+
 
 // ==========================================
 // 🤖 Module 2: AI Travel Assistant
@@ -130,7 +144,6 @@ app.get('/api/seed-spots', async (req, res) => {
     const premiumSpots = [
       {
         name: 'Lalbagh Fort', nameBN: 'লালবাগ কেল্লা',
-        // 🟢 এটি আপনার ফোল্ডারে নেই, তাই অনলাইন রাখা হলো
         mainImage: 'https://images.pexels.com/photos/34957286/pexels-photo-34957286.jpeg',
         sliderImages: ['https://images.pexels.com/photos/34957286/pexels-photo-34957286.jpeg'],
         location: 'Old Dhaka', locationBN: 'পুরান ঢাকা',
@@ -141,7 +154,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: "Cox's Bazar", nameBN: 'কক্সবাজার',
-        // 🟢 coxsbazar.jpg
         mainImage: `${local}coxsbazar.jpg`, 
         sliderImages: [`${local}coxsbazar.jpg`],
         location: 'Chittagong Division', locationBN: 'চট্টগ্রাম বিভাগ',
@@ -152,7 +164,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Ratargul Swamp Forest', nameBN: 'রাতারগুল জলাবন',
-        // 🟢 ratargul.jpg
         mainImage: `${local}ratargul.jpg`, 
         sliderImages: [`${local}ratargul.jpg`],
         location: 'Sylhet', locationBN: 'সিলেট',
@@ -163,7 +174,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Ahsan Manzil', nameBN: 'আহসান মঞ্জিল',
-        // 🟢 ahsanmanjil.jpg
         mainImage: `${local}ahsanmanjil.jpg`, 
         sliderImages: [`${local}ahsanmanjil.jpg`],
         location: 'Kumartoli, Dhaka', locationBN: 'কুমারটুলি, ঢাকা',
@@ -174,7 +184,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: "Saint Martin's Island", nameBN: 'সেন্টমার্টিন দ্বীপ',
-        // 🟢 Saint_Martin_(6).jpg
         mainImage: `${local}Saint_Martin_(6).jpg`,
         sliderImages: [`${local}Saint_Martin_(6).jpg`],
         location: 'Teknaf', locationBN: 'টেকনাফ',
@@ -185,7 +194,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Sundarbans', nameBN: 'সুন্দরবন',
-        // 🟢 Sundarban.jpg
         mainImage: `${local}Sundarban.jpg`,
         sliderImages: [`${local}Sundarban.jpg`],
         location: 'Khulna', locationBN: 'খুলনা',
@@ -196,29 +204,26 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Sajek Valley', nameBN: 'সাজেক ভ্যালি',
-        // 🟢 Sajek.jpg
         mainImage: `${local}Sajek.jpg`,
         sliderImages: [`${local}Sajek.jpg`],
         location: 'Rangamati', locationBN: 'রাঙ্গামাটি',
         lat: 23.3820, lng: 92.2938,
         description: 'Known as the Queen of Hills.',
-        descriptionBN: 'পাহাড়ের রানি বলা হয় সাজেককে।',
+        descriptionBN: 'পাহাড়ের রানি বলা হয় সাজেককে।',
         bestVisitingTime: 'Monsoon/Winter', estimatedBudget: '6000 BDT', nearbyHotels: 'Sajek Resort', safetyTips: 'Follow army escort timings.'
       },
       {
         name: 'Bandarban', nameBN: 'বান্দরবান',
-        // 🟢 bandarban.jpg
         mainImage: `${local}bandarban.jpg`,
         sliderImages: [`${local}bandarban.jpg`],
         location: 'Bandarban', locationBN: 'বান্দরবান',
         lat: 22.1953, lng: 92.2184,
         description: 'Beautiful mountain ranges like Nilgiri.',
-        descriptionBN: 'চমৎকার পাহাড় সারির জন্য বিখ্যাত।',
+        descriptionBN: 'চমৎকার পাহাড় সারির জন্য বিখ্যাত।',
         bestVisitingTime: 'Winter', estimatedBudget: '5000 BDT', nearbyHotels: 'Venus Resort', safetyTips: 'Be cautious on hilly roads.'
       },
       {
         name: 'Kaptai Lake', nameBN: 'কাপ্তাই লেক',
-        // 🟢 kaptai.jpg
         mainImage: `${local}kaptai.jpg`,
         sliderImages: [`${local}kaptai.jpg`],
         location: 'Rangamati', locationBN: 'রাঙ্গামাটি',
@@ -229,10 +234,9 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Alutila Cave', nameBN: 'আলুটিলা গুহা',
-        // 🟢 khagrachari.jpg
         mainImage: `${local}khagrachari.jpg`,
         sliderImages: [`${local}khagrachari.jpg`],
-        location: 'Khagrachari', locationBN: 'খাগড়াছড়ি',
+        location: 'Khagrachari', locationBN: 'খাগড়াছড়ি',
         lat: 23.1105, lng: 91.9738,
         description: 'A mysterious dark natural cave.',
         descriptionBN: 'একটি রহস্যময় প্রাকৃতিক গুহা।',
@@ -240,18 +244,16 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Shat Gombuj Masjid', nameBN: 'ষাট গম্বুজ মসজিদ',
-        // 🟢 shatgambuj.jpg
         mainImage: `${local}shatgambuj.jpg`,
         sliderImages: [`${local}shatgambuj.jpg`],
         location: 'Bagerhat', locationBN: 'বাগেরহাট',
         lat: 22.6744, lng: 89.7415,
         description: 'UNESCO World Heritage Site.',
-        descriptionBN: 'ইউনেস্কো ওয়ার্ল্ড হেরিটেজ সাইট।',
+        descriptionBN: 'ইউনেস্কো ওয়ার্ল্ড হেরিটেজ সাইট।',
         bestVisitingTime: 'Anytime', estimatedBudget: '2000 BDT', nearbyHotels: 'Bagerhat Motel', safetyTips: 'Dress modestly.'
       },
       {
         name: 'Sompur Mahavihara', nameBN: 'সোমপুর মহাবিহার',
-        // 🟢 sompur bihar.jpg
         mainImage: `${local}sompur%20bihar.jpg`,
         sliderImages: [`${local}sompur%20bihar.jpg`],
         location: 'Naogaon', locationBN: 'নওগাঁ',
@@ -262,7 +264,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Bhawal National Park', nameBN: 'ভাওয়াল জাতীয় উদ্যান',
-        // 🟢 bhawal national park.jpg
         mainImage: `${local}bhawal%20national%20park.jpg`,
         sliderImages: [`${local}bhawal%20national%20park.jpg`],
         location: 'Gazipur', locationBN: 'গাজীপুর',
@@ -273,7 +274,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Safari Park', nameBN: 'সাফারি পার্ক',
-        // 🟢 safari park.jpg
         mainImage: `${local}safari%20park.jpg`,
         sliderImages: [`${local}safari%20park.jpg`],
         location: 'Gazipur', locationBN: 'গাজীপুর',
@@ -284,7 +284,6 @@ app.get('/api/seed-spots', async (req, res) => {
       },
       {
         name: 'Jaflong', nameBN: 'জাফলং',
-        // 🟢 jaflong.jpg
         mainImage: `${local}jaflong.jpg`,
         sliderImages: [`${local}jaflong.jpg`],
         location: 'Sylhet', locationBN: 'সিলেট',

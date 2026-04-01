@@ -16,21 +16,22 @@ const Profile = () => {
   
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // 🟢 ইউজারের বুকিংগুলো রাখার জন্য নতুন State
+  const [myBookings, setMyBookings] = useState([]);
 
-  // 🟢 ১. ব্যাকএন্ড থেকে প্রোফাইল ডাটা লোড করা
   useEffect(() => {
     if (!token) {
       navigate('/login');
       return;
     }
 
+    // প্রোফাইল ডাটা ফেচ করা
     const fetchProfile = async () => {
       try {
         const response = await fetch('http://localhost:5000/api/auth/profile', {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
@@ -49,14 +50,31 @@ const Profile = () => {
       }
     };
 
+    // 🟢 বুকিং ডাটা ফেচ করা
+    const fetchBookings = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/bookings/my-bookings', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setMyBookings(data);
+        }
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+      }
+    };
+
     fetchProfile();
+    fetchBookings(); // 🟢 কল করা হলো
   }, [token, navigate]);
 
   const handleChange = (e) => {
     setUser({ ...user, [e.target.name]: e.target.value });
   };
 
-  // 🟢 ২. ব্যাকএন্ডে প্রোফাইল আপডেট পাঠানো
   const handleSave = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -125,7 +143,7 @@ const Profile = () => {
         </div>
 
         {/* Profile Details / Edit Form */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-10">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-10 mb-8">
           <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
             <h2 className="text-2xl font-bold text-[#0a192f]">
               {isEditing ? 'Edit Personal Info' : 'Personal Information'}
@@ -220,6 +238,44 @@ const Profile = () => {
             )}
           </form>
         </div>
+
+        {/* 🟢 New: My Booking History Section */}
+        {user.role === 'Tourist' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-10">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+              <h2 className="text-2xl font-bold text-[#0a192f]">My Booking History</h2>
+            </div>
+            
+            {myBookings.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                <p className="text-gray-500 font-medium">You haven't booked any packages yet.</p>
+                <button onClick={() => navigate('/packages')} className="mt-4 text-[#00df9a] font-bold hover:underline">Explore Packages</button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myBookings.map((booking) => (
+                  <div key={booking._id} className="flex flex-col sm:flex-row justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
+                    <div className="mb-3 sm:mb-0 text-center sm:text-left">
+                      <h3 className="font-bold text-lg text-[#0a192f]">{booking.package?.title || 'Unknown Package'}</h3>
+                      <p className="text-sm text-gray-500">Agency: {booking.agency?.name}</p>
+                      <p className="text-xs text-gray-400 mt-1">Booked on: {new Date(booking.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    
+                    <div className="flex flex-col items-center sm:items-end">
+                      <span className="font-bold text-[#0a192f] mb-1">৳{booking.package?.price || '0'}</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        booking.status === 'Approved' ? 'bg-green-100 text-green-700' : 
+                        booking.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {booking.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

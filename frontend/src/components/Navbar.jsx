@@ -7,7 +7,7 @@ const Navbar = () => {
   const { language, changeLanguage } = useLanguage(); 
   const token = localStorage.getItem('token');
   
-  // 🟢 ইউজারের রোল বের করা এবং ছোট হাতের অক্ষরে (lowercase) কনভার্ট করা যাতে স্পেলিং ভুল না হয়
+  // 🟢 ইউজারের রোল বের করা এবং ছোট হাতের অক্ষরে (lowercase) কনভার্ট করা যাতে স্পেলিং ভুল না হয়
   const userRole = (localStorage.getItem('role') || 'tourist').toLowerCase(); 
   
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -40,6 +40,12 @@ const Navbar = () => {
             <Link to="/country/bangladesh" className="text-gray-300 hover:text-[#00df9a] font-medium text-sm uppercase">
               {language === 'bn' ? 'গন্তব্য' : 'Destinations'}
             </Link>
+            
+            {/* 🟢 নতুন TOUR PACKAGES বাটন যোগ করা হলো */}
+            <Link to="/packages" className="text-gray-300 hover:text-[#00df9a] font-medium text-sm uppercase">
+              {language === 'bn' ? 'ট্যুর প্যাকেজ' : 'Tour Packages'}
+            </Link>
+
             <Link to="/about" className="text-gray-300 hover:text-[#00df9a] font-medium text-sm uppercase">
               {language === 'bn' ? 'আমাদের সম্পর্কে' : 'About'}
             </Link>

@@ -18,6 +18,7 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import About from './pages/About'; 
+import TourPackages from './pages/TourPackages'; // 🟢 নতুন পেজ ইম্পোর্ট করা হলো
 
 // ==========================================
 // 🔒 PrivateRoute
@@ -47,7 +48,7 @@ function App() {
       <Router>
         <div className="App font-sans bg-gray-50 min-h-screen flex flex-col">
           
-          {/* 🧭 Navbar কনটেক্সটের ভেতরে থাকায় এখন ল্যাঙ্গুয়েজ পাবে */}
+          {/* 🧭 Navbar কনটেক্সটের ভেতরে থাকায় এখন ল্যাঙ্গুয়েজ পাবে */}
           <Navbar />
           
           <main className="flex-grow pt-20"> 
@@ -57,6 +58,9 @@ function App() {
               <Route path="/about" element={<About />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              
+              {/* 🟢 এই রাউটটা মিসিং ছিল! */}
+              <Route path="/packages" element={<TourPackages />} /> 
 
               {/* Private Routes */}
               <Route path="/country/bangladesh" element={<PrivateRoute><Bangladesh /></PrivateRoute>} />
