@@ -13,10 +13,13 @@ const UserSchema = new mongoose.Schema({
   address: { type: String, default: '' },
   bio: { type: String, default: '' },
 
-  // 🎯 নতুন যোগ করা হলো: এশিতার Recommendation System-এর জন্য
+  // 🎯 এশিতার Recommendation System-এর জন্য
   budgetPreference: { type: String, default: '' }, // যেমন: 'Low', 'Medium', 'High'
   tripDurationPreference: { type: String, default: '' }, // যেমন: 'Short', 'Medium', 'Long'
-  searchHistory: [{ type: String }] // ইউজার আগে কী কী সার্চ করেছে তার লিস্ট
+  searchHistory: [{ type: String }], // ইউজার আগে কী কী সার্চ করেছে তার লিস্ট
+
+  // 🟢 এশিতার লিডারবোর্ড ও পয়েন্ট সিস্টেমের জন্য নতুন যোগ করা হলো
+  points: { type: Number, default: 0 } 
 });
 
 // 🟢 পাসওয়ার্ড হ্যাশিং লজিক (ফিক্স করা হয়েছে: next() এবং এরর বাদ দেওয়া হয়েছে)

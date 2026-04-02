@@ -21,11 +21,9 @@ const Bangladesh = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // রেটিং এবং কমেন্টের জন্য স্টেট 
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
-  // এশিতার Recommendation Engine এর জন্য স্টেট
   const [budgetPref, setBudgetPref] = useState('Medium');
   const [durationPref, setDurationPref] = useState('1-3 Days');
   const [recommendedSpots, setRecommendedSpots] = useState([]);
@@ -76,51 +74,77 @@ const Bangladesh = () => {
     window.open(`https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(query)}`, '_blank');
   };
 
-  // 🟢 সুজনের Task: Backend এ Review Submit করা
+  // 🟢 দ্য আল্টিমেট বুলেটপ্রুফ সাবমিট ফাংশন
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     try {
+      const token = localStorage.getItem('token');
+      let userId = localStorage.getItem('userId'); 
+      let userName = localStorage.getItem('name');
+
+      if (!token) {
+        alert(language === 'bn' ? 'রিভিউ দিতে আগে লগইন করুন!' : 'Please login first to submit a review!');
+        return;
+      }
+
+      // 🔴 ম্যাজিক ফিক্স: নাম না পেলে জোর করে লগআউট করাবে না, বরং নাম জিজ্ঞেস করবে!
+      if (!userName || userName === "undefined" || userName === "null" || userName === "Verified Tourist") {
+        userName = window.prompt(language === 'bn' ? "পয়েন্ট পেতে আপনার রেজিস্টার্ড নাম লিখুন (যেমন: Jisan):" : "Enter your registered name to get points:");
+        
+        if (!userName) userName = "Genie Tourist"; // যদি কেউ নাম না দেয়
+        else localStorage.setItem('name', userName); // পরের বারের জন্য সেভ করে রাখলো
+      }
+
+      if (!userId || userId === "undefined" || userId === "null") {
+        userId = null; 
+      }
+
       const res = await fetch(`http://localhost:5000/api/spots/${selectedSpot._id}/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName: "Genie Tourist", rating, comment })
+        body: JSON.stringify({ 
+          userName: userName, 
+          userId: userId,     
+          rating, 
+          comment 
+        })
       });
+
+      const data = await res.json();
+
       if (res.ok) {
-        alert(language === 'bn' ? 'রিভিউ সফলভাবে যোগ করা হয়েছে!' : 'Review submitted successfully!');
+        alert(language === 'bn' ? 'রিভিউ সফলভাবে যোগ করা হয়েছে এবং আপনি পয়েন্ট পেয়েছেন! 🎉' : 'Review submitted successfully and points awarded! 🎉');
         setComment(''); 
         fetchSpots(); 
-        const updatedRes = await res.json();
-        setSelectedSpot(updatedRes.spot);
+        setSelectedSpot(data.spot); 
+      } else {
+        alert("সার্ভার থেকে এরর এসেছে: " + (data.message || "Unknown Error"));
       }
     } catch (err) {
-      console.error(err);
+      console.error("Submission Error:", err);
+      alert("নেটওয়ার্ক এরর! আপনার ব্যাকএন্ড কি চালু আছে?");
     }
   };
 
-  // 🟢 এশিতার Task: Backend এর সাথে Recommendation API Integration
   const getRecommendations = async (e) => {
     e.preventDefault();
     setRecLoading(true);
 
     try {
-      // ইউজারের আইডি লোকাল স্টোরেজ থেকে নেওয়া হচ্ছে (লগইন থাকলে), না থাকলে একটি ডেমো আইডি
       const userId = localStorage.getItem('userId') || "65eabcd1234567890abcdef1"; 
 
-      // ১. ব্যাকএন্ডে ইউজারের পছন্দ (Preferences) সেভ করা
       await fetch(`http://localhost:5000/api/users/${userId}/preferences`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ budgetPreference: budgetPref, tripDurationPreference: durationPref })
       });
 
-      // ২. ব্যাকএন্ড থেকে পার্সোনালাইজড রিকমেন্ডেশন ফেচ করা
       const res = await fetch(`http://localhost:5000/api/users/${userId}/recommendations`);
 
       if (res.ok) {
         const data = await res.json();
-        setRecommendedSpots(data.slice(0, 3)); // সেরা ৩টি স্পট দেখাবে
+        setRecommendedSpots(data.slice(0, 3)); 
       } else {
-        // টেস্টিং এর সময় ডেমো ইউজারের কারণে ব্যাকএন্ড এরর দিলে লোকাল ফলব্যাক কাজ করবে
         fallbackRecommendations();
       }
     } catch (error) {
@@ -131,7 +155,6 @@ const Bangladesh = () => {
     }
   };
 
-  // 🛠️ Fallback: টেস্টিং এর সময় যদি ডাটাবেসে ইউজার না থাকে, তখন যাতে UI না ভাঙে
   const fallbackRecommendations = () => {
     let recs = places.filter(spot => {
       let score = 0;
@@ -309,7 +332,7 @@ const Bangladesh = () => {
         </div>
       </div>
 
-      {/* 🔥 Premium Modal with Slider AND Inner Map AND Reviews */}
+      {/* 🔥 Premium Modal */}
       {selectedSpot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6 transition-all duration-300 backdrop-blur-sm">
           
@@ -354,15 +377,13 @@ const Bangladesh = () => {
               </div>
             </div>
 
-            {/* Modal Body: Info, Map & Reviews */}
+            {/* Modal Body */}
             <div className="p-6 md:p-7">
               <p className="text-gray-600 text-sm mb-5 leading-relaxed font-medium">
                 {language === 'bn' && selectedSpot.descriptionBN ? selectedSpot.descriptionBN : selectedSpot.description}
               </p>
 
-              {/* Grid: 1st Column (Info), 2nd Column (Leaflet Map) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-2">
-                
                 <div className="grid grid-cols-1 gap-3">
                   <div className="flex items-center gap-3 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="text-xl bg-white p-2.5 rounded-xl shadow-sm">🕒</div>
@@ -397,7 +418,6 @@ const Bangladesh = () => {
                   </div>
                 </div>
 
-                {/* 🗺️ Live Leaflet Map Container */}
                 <div className="h-64 lg:h-full w-full rounded-2xl overflow-hidden border border-gray-200 relative z-0 shadow-sm">
                   <MapContainer center={[selectedSpot.lat, selectedSpot.lng]} zoom={13} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -406,16 +426,14 @@ const Bangladesh = () => {
                     </Marker>
                   </MapContainer>
                 </div>
-                
               </div>
 
-              {/* ⭐ Ratings & Reviews Section (Sujan's Task) */}
+              {/* ⭐ Ratings & Reviews Section */}
               <div className="mt-8 border-t border-gray-100 pt-6">
                 <h3 className="text-xl font-bold text-[#0a192f] mb-4 flex items-center gap-2">
                   <span>💬</span> {language === 'bn' ? 'পর্যালোচকদের মতামত' : 'Tourist Reviews & Ratings'}
                 </h3>
                 
-                {/* Review Display Area */}
                 <div className="space-y-4 mb-6 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                   {selectedSpot.reviews && selectedSpot.reviews.length > 0 ? (
                     selectedSpot.reviews.map((rev, idx) => (
@@ -441,7 +459,6 @@ const Bangladesh = () => {
                   )}
                 </div>
 
-                {/* Review Submission Form */}
                 <form onSubmit={handleReviewSubmit} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <label className="text-sm font-bold text-[#0a192f]">{language === 'bn' ? 'আপনার রেটিং দিন:' : 'Rate your experience:'}</label>

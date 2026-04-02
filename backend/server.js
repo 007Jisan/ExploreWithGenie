@@ -14,29 +14,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🟢 লোকাল ছবি সার্ভ করার জন্য স্ট্যাটিক ফোল্ডার
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// ==========================================
-// 🔐 Auth Routes
-// ==========================================
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
-// ==========================================
-// 🏢 Module 3: Agency Package Routes
-// ==========================================
 const packageRoutes = require('./routes/packageRoutes');
 app.use('/api/packages', packageRoutes);
 
-// 🟢 নতুন যোগ করা হলো: Booking Routes
 const bookingRoutes = require('./routes/bookingRoutes');
 app.use('/api/bookings', bookingRoutes);
 
-
-// ==========================================
-// 🤖 Module 2: AI Travel Assistant
-// ==========================================
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1", 
   apiKey: process.env.OPENAI_API_KEY, 
@@ -63,9 +51,6 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// ==========================================
-// 🎯 Ratings, Reviews & Recommendations
-// ==========================================
 app.get('/api/spots', async (req, res) => {
     try {
       const spots = await Spot.find();
@@ -75,17 +60,74 @@ app.get('/api/spots', async (req, res) => {
     }
 });
 
+// 🟢 Bulletproof Review & Points Logic
 app.post('/api/spots/:id/reviews', async (req, res) => {
     try {
       const spot = await Spot.findById(req.params.id);
       if (!spot) return res.status(404).json({ message: "Spot not found" });
-      const newReview = { userName: req.body.userName || "Genie Tourist", rating: Number(req.body.rating), comment: req.body.comment };
+      
+      const newReview = { 
+        userName: req.body.userName || "Genie Tourist", 
+        rating: Number(req.body.rating), 
+        comment: req.body.comment 
+      };
       spot.reviews.push(newReview);
-      await spot.save();
-      res.status(201).json({ message: "Review added!", spot });
+      await spot.save(); 
+
+      // 🔴 ম্যাজিক ফিক্স: আইডি দিয়ে না পেলে নাম দিয়ে খুঁজে পয়েন্ট দেবে!
+      let user = null;
+      if (req.body.userId && req.body.userId !== "undefined" && req.body.userId !== "null") {
+        if (mongoose.Types.ObjectId.isValid(req.body.userId)) {
+           user = await User.findById(req.body.userId);
+        }
+      }
+
+      // যদি আইডি ভুল থাকে, তাহলে নাম দিয়ে ট্রাই করবে
+      if (!user && req.body.userName && req.body.userName !== "Verified Tourist") {
+        user = await User.findOne({ name: req.body.userName });
+      }
+
+      // ইউজার পেলেই পয়েন্ট যোগ!
+      if (user) {
+        user.points = (user.points || 0) + 10;
+        await user.save();
+      }
+
+      res.status(201).json({ message: "Review added and points awarded! 🎉", spot });
     } catch (error) {
+      console.error("Review Error:", error);
       res.status(500).json({ message: "Server Error" });
     }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+      // যাদের পয়েন্ট ০ এর বেশি, তাদেরকেই লিডারবোর্ডে আনবে
+      const users = await User.find({ points: { $gt: 0 } }).sort({ points: -1 }).limit(10).select('name points');
+      res.json(users);
+  } catch(err) { 
+      res.status(500).json({message: "Error fetching leaderboard"}); 
+  }
+});
+
+app.get('/api/admin/users', async (req, res) => {
+  try {
+      const users = await User.find().select('-password').sort({ createdAt: -1 });
+      res.json(users);
+  } catch(err) { 
+      res.status(500).json({message: "Error fetching users"}); 
+  }
+});
+
+app.delete('/api/admin/spots/:spotId/reviews/:reviewId', async (req, res) => {
+  try {
+      const spot = await Spot.findById(req.params.spotId);
+      spot.reviews = spot.reviews.filter(r => r._id.toString() !== req.params.reviewId);
+      await spot.save();
+      res.json({message: "Review deleted successfully 🗑️"});
+  } catch(err) { 
+      res.status(500).json({message: "Error deleting review"}); 
+  }
 });
 
 app.post('/api/users/:id/preferences', async (req, res) => {
@@ -132,166 +174,27 @@ app.get('/api/users/:id/recommendations', async (req, res) => {
   }
 });
 
-// ==========================================
-// 🚀 Seed Route (১৪টি স্পট স্ক্রিনশট থেকে অফলাইন, ১টি অনলাইন)
-// ==========================================
 app.get('/api/seed-spots', async (req, res) => {
   try {
     await Spot.deleteMany({}); 
-
     const local = "http://localhost:5000/images/";
 
     const premiumSpots = [
-      {
-        name: 'Lalbagh Fort', nameBN: 'লালবাগ কেল্লা',
-        mainImage: 'https://images.pexels.com/photos/34957286/pexels-photo-34957286.jpeg',
-        sliderImages: ['https://images.pexels.com/photos/34957286/pexels-photo-34957286.jpeg'],
-        location: 'Old Dhaka', locationBN: 'পুরান ঢাকা',
-        lat: 23.7198, lng: 90.3883,
-        description: 'Lalbagh Fort is an incomplete 17th-century Mughal fort complex.',
-        descriptionBN: '১৭শ শতকের মোগল আমলের একটি অসম্পূর্ণ দুর্গ।',
-        bestVisitingTime: 'November to March', estimatedBudget: '500 BDT', nearbyHotels: 'Hotel 71', safetyTips: 'Beware of pickpockets.'
-      },
-      {
-        name: "Cox's Bazar", nameBN: 'কক্সবাজার',
-        mainImage: `${local}coxsbazar.jpg`, 
-        sliderImages: [`${local}coxsbazar.jpg`],
-        location: 'Chittagong Division', locationBN: 'চট্টগ্রাম বিভাগ',
-        lat: 21.4272, lng: 92.0058,
-        description: 'The longest natural unbroken sea beach in the world.',
-        descriptionBN: 'বিশ্বের দীর্ঘতম প্রাকৃতিক সমুদ্র সৈকত।',
-        bestVisitingTime: 'Oct-Mar', estimatedBudget: '5000 BDT', nearbyHotels: 'Sayeman Resort', safetyTips: 'Do not swim far during high tide.'
-      },
-      {
-        name: 'Ratargul Swamp Forest', nameBN: 'রাতারগুল জলাবন',
-        mainImage: `${local}ratargul.jpg`, 
-        sliderImages: [`${local}ratargul.jpg`],
-        location: 'Sylhet', locationBN: 'সিলেট',
-        lat: 25.0022, lng: 91.9702,
-        description: 'Only freshwater swamp forest in Bangladesh.',
-        descriptionBN: 'বাংলাদেশের একমাত্র মিঠাপানির জলাবন।',
-        bestVisitingTime: 'July-Oct', estimatedBudget: '3000 BDT', nearbyHotels: 'Grand Sylhet', safetyTips: 'Beware of snakes.'
-      },
-      {
-        name: 'Ahsan Manzil', nameBN: 'আহসান মঞ্জিল',
-        mainImage: `${local}ahsanmanjil.jpg`, 
-        sliderImages: [`${local}ahsanmanjil.jpg`],
-        location: 'Kumartoli, Dhaka', locationBN: 'কুমারটুলি, ঢাকা',
-        lat: 23.7086, lng: 90.4060,
-        description: 'The official residential palace of the Nawab of Dhaka.',
-        descriptionBN: 'ঢাকার নবাবদের সাবেক সরকারি বাসভবন।',
-        bestVisitingTime: 'Anytime', estimatedBudget: '300 BDT', nearbyHotels: 'Pan Pacific', safetyTips: 'Photography inside restricted.'
-      },
-      {
-        name: "Saint Martin's Island", nameBN: 'সেন্টমার্টিন দ্বীপ',
-        mainImage: `${local}Saint_Martin_(6).jpg`,
-        sliderImages: [`${local}Saint_Martin_(6).jpg`],
-        location: 'Teknaf', locationBN: 'টেকনাফ',
-        lat: 20.6270, lng: 92.3222,
-        description: 'The only coral island in Bangladesh.',
-        descriptionBN: 'বাংলাদেশের একমাত্র প্রবাল দ্বীপ।',
-        bestVisitingTime: 'Winter', estimatedBudget: '8000 BDT', nearbyHotels: 'Blue Marine', safetyTips: 'Check ship schedules.'
-      },
-      {
-        name: 'Sundarbans', nameBN: 'সুন্দরবন',
-        mainImage: `${local}Sundarban.jpg`,
-        sliderImages: [`${local}Sundarban.jpg`],
-        location: 'Khulna', locationBN: 'খুলনা',
-        lat: 21.9497, lng: 89.1833,
-        description: 'World\'s largest mangrove forest.',
-        descriptionBN: 'বিশ্বের বৃহত্তম ম্যানগ্রোভ বন।',
-        bestVisitingTime: 'Winter', estimatedBudget: '10000 BDT', nearbyHotels: 'Eco Resorts', safetyTips: 'Always stay with guide.'
-      },
-      {
-        name: 'Sajek Valley', nameBN: 'সাজেক ভ্যালি',
-        mainImage: `${local}Sajek.jpg`,
-        sliderImages: [`${local}Sajek.jpg`],
-        location: 'Rangamati', locationBN: 'রাঙ্গামাটি',
-        lat: 23.3820, lng: 92.2938,
-        description: 'Known as the Queen of Hills.',
-        descriptionBN: 'পাহাড়ের রানি বলা হয় সাজেককে।',
-        bestVisitingTime: 'Monsoon/Winter', estimatedBudget: '6000 BDT', nearbyHotels: 'Sajek Resort', safetyTips: 'Follow army escort timings.'
-      },
-      {
-        name: 'Bandarban', nameBN: 'বান্দরবান',
-        mainImage: `${local}bandarban.jpg`,
-        sliderImages: [`${local}bandarban.jpg`],
-        location: 'Bandarban', locationBN: 'বান্দরবান',
-        lat: 22.1953, lng: 92.2184,
-        description: 'Beautiful mountain ranges like Nilgiri.',
-        descriptionBN: 'চমৎকার পাহাড় সারির জন্য বিখ্যাত।',
-        bestVisitingTime: 'Winter', estimatedBudget: '5000 BDT', nearbyHotels: 'Venus Resort', safetyTips: 'Be cautious on hilly roads.'
-      },
-      {
-        name: 'Kaptai Lake', nameBN: 'কাপ্তাই লেক',
-        mainImage: `${local}kaptai.jpg`,
-        sliderImages: [`${local}kaptai.jpg`],
-        location: 'Rangamati', locationBN: 'রাঙ্গামাটি',
-        lat: 22.6533, lng: 92.1525,
-        description: 'Largest man-made lake in Bangladesh.',
-        descriptionBN: 'বাংলাদেশের বৃহত্তম কৃত্রিম হ্রদ।',
-        bestVisitingTime: 'Winter', estimatedBudget: '4000 BDT', nearbyHotels: 'Parjatan Motel', safetyTips: 'Wear life jackets.'
-      },
-      {
-        name: 'Alutila Cave', nameBN: 'আলুটিলা গুহা',
-        mainImage: `${local}khagrachari.jpg`,
-        sliderImages: [`${local}khagrachari.jpg`],
-        location: 'Khagrachari', locationBN: 'খাগড়াছড়ি',
-        lat: 23.1105, lng: 91.9738,
-        description: 'A mysterious dark natural cave.',
-        descriptionBN: 'একটি রহস্যময় প্রাকৃতিক গুহা।',
-        bestVisitingTime: 'Winter', estimatedBudget: '3000 BDT', nearbyHotels: 'Guyamara Resort', safetyTips: 'Floor is slippery.'
-      },
-      {
-        name: 'Shat Gombuj Masjid', nameBN: 'ষাট গম্বুজ মসজিদ',
-        mainImage: `${local}shatgambuj.jpg`,
-        sliderImages: [`${local}shatgambuj.jpg`],
-        location: 'Bagerhat', locationBN: 'বাগেরহাট',
-        lat: 22.6744, lng: 89.7415,
-        description: 'UNESCO World Heritage Site.',
-        descriptionBN: 'ইউনেস্কো ওয়ার্ল্ড হেরিটেজ সাইট।',
-        bestVisitingTime: 'Anytime', estimatedBudget: '2000 BDT', nearbyHotels: 'Bagerhat Motel', safetyTips: 'Dress modestly.'
-      },
-      {
-        name: 'Sompur Mahavihara', nameBN: 'সোমপুর মহাবিহার',
-        mainImage: `${local}sompur%20bihar.jpg`,
-        sliderImages: [`${local}sompur%20bihar.jpg`],
-        location: 'Naogaon', locationBN: 'নওগাঁ',
-        lat: 25.0323, lng: 88.9769,
-        description: 'An ancient Buddhist monastery.',
-        descriptionBN: 'প্রাচীন বৌদ্ধ বিহার।',
-        bestVisitingTime: 'Winter', estimatedBudget: '3000 BDT', nearbyHotels: 'Naogaon Motel', safetyTips: 'Respect the site.'
-      },
-      {
-        name: 'Bhawal National Park', nameBN: 'ভাওয়াল জাতীয় উদ্যান',
-        mainImage: `${local}bhawal%20national%20park.jpg`,
-        sliderImages: [`${local}bhawal%20national%20park.jpg`],
-        location: 'Gazipur', locationBN: 'গাজীপুর',
-        lat: 24.0617, lng: 90.4024,
-        description: 'Beautiful Sal forests.',
-        descriptionBN: 'ঘন শালবনের চমৎকার স্পট।',
-        bestVisitingTime: 'Winter', estimatedBudget: '1000 BDT', nearbyHotels: 'Sarah Resort', safetyTips: 'Don\'t go deep alone.'
-      },
-      {
-        name: 'Safari Park', nameBN: 'সাফারি পার্ক',
-        mainImage: `${local}safari%20park.jpg`,
-        sliderImages: [`${local}safari%20park.jpg`],
-        location: 'Gazipur', locationBN: 'গাজীপুর',
-        lat: 24.1839, lng: 90.3957,
-        description: 'A massive wildlife park.',
-        descriptionBN: 'একটি বিশাল বন্যপ্রাণী পার্ক।',
-        bestVisitingTime: 'Winter', estimatedBudget: '2000 BDT', nearbyHotels: 'Atlantis Resort', safetyTips: 'Stay inside the safari bus.'
-      },
-      {
-        name: 'Jaflong', nameBN: 'জাফলং',
-        mainImage: `${local}jaflong.jpg`,
-        sliderImages: [`${local}jaflong.jpg`],
-        location: 'Sylhet', locationBN: 'সিলেট',
-        lat: 25.1634, lng: 92.0151,
-        description: 'Renowned for its stone collections and clear river water.',
-        descriptionBN: 'পাথর সংগ্রহ এবং স্বচ্ছ নদীর পানির জন্য পরিচিত।',
-        bestVisitingTime: 'Autumn', estimatedBudget: '4000 BDT', nearbyHotels: 'Jaflong Inn', safetyTips: 'Do not cross the border.'
-      }
+      { name: 'Lalbagh Fort', nameBN: 'লালবাগ কেল্লা', mainImage: 'https://images.pexels.com/photos/34957286/pexels-photo-34957286.jpeg', sliderImages: ['https://images.pexels.com/photos/34957286/pexels-photo-34957286.jpeg'], location: 'Old Dhaka', locationBN: 'পুরান ঢাকা', lat: 23.7198, lng: 90.3883, description: 'Lalbagh Fort is an incomplete 17th-century Mughal fort complex.', descriptionBN: '১৭শ শতকের মোগল আমলের একটি অসম্পূর্ণ দুর্গ।', bestVisitingTime: 'November to March', estimatedBudget: '500 BDT', nearbyHotels: 'Hotel 71', safetyTips: 'Beware of pickpockets.' },
+      { name: "Cox's Bazar", nameBN: 'কক্সবাজার', mainImage: `${local}coxsbazar.jpg`, sliderImages: [`${local}coxsbazar.jpg`], location: 'Chittagong Division', locationBN: 'চট্টগ্রাম বিভাগ', lat: 21.4272, lng: 92.0058, description: 'The longest natural unbroken sea beach in the world.', descriptionBN: 'বিশ্বের দীর্ঘতম প্রাকৃতিক সমুদ্র সৈকত।', bestVisitingTime: 'Oct-Mar', estimatedBudget: '5000 BDT', nearbyHotels: 'Sayeman Resort', safetyTips: 'Do not swim far during high tide.' },
+      { name: 'Ratargul Swamp Forest', nameBN: 'রাতারগুল জলাবন', mainImage: `${local}ratargul.jpg`, sliderImages: [`${local}ratargul.jpg`], location: 'Sylhet', locationBN: 'সিলেট', lat: 25.0022, lng: 91.9702, description: 'Only freshwater swamp forest in Bangladesh.', descriptionBN: 'বাংলাদেশের একমাত্র মিঠাপানির জলাবন।', bestVisitingTime: 'July-Oct', estimatedBudget: '3000 BDT', nearbyHotels: 'Grand Sylhet', safetyTips: 'Beware of snakes.' },
+      { name: 'Ahsan Manzil', nameBN: 'আহসান মঞ্জিল', mainImage: `${local}ahsanmanjil.jpg`, sliderImages: [`${local}ahsanmanjil.jpg`], location: 'Kumartoli, Dhaka', locationBN: 'কুমারটুলি, ঢাকা', lat: 23.7086, lng: 90.4060, description: 'The official residential palace of the Nawab of Dhaka.', descriptionBN: 'ঢাকার নবাবদের সাবেক সরকারি বাসভবন।', bestVisitingTime: 'Anytime', estimatedBudget: '300 BDT', nearbyHotels: 'Pan Pacific', safetyTips: 'Photography inside restricted.' },
+      { name: "Saint Martin's Island", nameBN: 'সেন্টমার্টিন দ্বীপ', mainImage: `${local}Saint_Martin_(6).jpg`, sliderImages: [`${local}Saint_Martin_(6).jpg`], location: 'Teknaf', locationBN: 'টেকনাফ', lat: 20.6270, lng: 92.3222, description: 'The only coral island in Bangladesh.', descriptionBN: 'বাংলাদেশের একমাত্র প্রবাল দ্বীপ।', bestVisitingTime: 'Winter', estimatedBudget: '8000 BDT', nearbyHotels: 'Blue Marine', safetyTips: 'Check ship schedules.' },
+      { name: 'Sundarbans', nameBN: 'সুন্দরবন', mainImage: `${local}Sundarban.jpg`, sliderImages: [`${local}Sundarban.jpg`], location: 'Khulna', locationBN: 'খুলনা', lat: 21.9497, lng: 89.1833, description: 'World\'s largest mangrove forest.', descriptionBN: 'বিশ্বের বৃহত্তম ম্যানগ্রোভ বন।', bestVisitingTime: 'Winter', estimatedBudget: '10000 BDT', nearbyHotels: 'Eco Resorts', safetyTips: 'Always stay with guide.' },
+      { name: 'Sajek Valley', nameBN: 'সাজেক ভ্যালি', mainImage: `${local}Sajek.jpg`, sliderImages: [`${local}Sajek.jpg`], location: 'Rangamati', locationBN: 'রাঙ্গামাটি', lat: 23.3820, lng: 92.2938, description: 'Known as the Queen of Hills.', descriptionBN: 'পাহাড়ের রানি বলা হয় সাজেককে।', bestVisitingTime: 'Monsoon/Winter', estimatedBudget: '6000 BDT', nearbyHotels: 'Sajek Resort', safetyTips: 'Follow army escort timings.' },
+      { name: 'Bandarban', nameBN: 'বান্দরবান', mainImage: `${local}bandarban.jpg`, sliderImages: [`${local}bandarban.jpg`], location: 'Bandarban', locationBN: 'বান্দরবান', lat: 22.1953, lng: 92.2184, description: 'Beautiful mountain ranges like Nilgiri.', descriptionBN: 'চমৎকার পাহাড় সারির জন্য বিখ্যাত।', bestVisitingTime: 'Winter', estimatedBudget: '5000 BDT', nearbyHotels: 'Venus Resort', safetyTips: 'Be cautious on hilly roads.' },
+      { name: 'Kaptai Lake', nameBN: 'কাপ্তাই লেক', mainImage: `${local}kaptai.jpg`, sliderImages: [`${local}kaptai.jpg`], location: 'Rangamati', locationBN: 'রাঙ্গামাটি', lat: 22.6533, lng: 92.1525, description: 'Largest man-made lake in Bangladesh.', descriptionBN: 'বাংলাদেশের বৃহত্তম কৃত্রিম হ্রদ।', bestVisitingTime: 'Winter', estimatedBudget: '4000 BDT', nearbyHotels: 'Parjatan Motel', safetyTips: 'Wear life jackets.' },
+      { name: 'Alutila Cave', nameBN: 'আলুটিলা গুহা', mainImage: `${local}khagrachari.jpg`, sliderImages: [`${local}khagrachari.jpg`], location: 'Khagrachari', locationBN: 'খাগড়াছড়ি', lat: 23.1105, lng: 91.9738, description: 'A mysterious dark natural cave.', descriptionBN: 'একটি রহস্যময় প্রাকৃতিক গুহা।', bestVisitingTime: 'Winter', estimatedBudget: '3000 BDT', nearbyHotels: 'Guyamara Resort', safetyTips: 'Floor is slippery.' },
+      { name: 'Shat Gombuj Masjid', nameBN: 'ষাট গম্বুজ মসজিদ', mainImage: `${local}shatgambuj.jpg`, sliderImages: [`${local}shatgambuj.jpg`], location: 'Bagerhat', locationBN: 'বাগেরহাট', lat: 22.6744, lng: 89.7415, description: 'UNESCO World Heritage Site.', descriptionBN: 'ইউনেস্কো ওয়ার্ল্ড হেরিটেজ সাইট।', bestVisitingTime: 'Anytime', estimatedBudget: '2000 BDT', nearbyHotels: 'Bagerhat Motel', safetyTips: 'Dress modestly.' },
+      { name: 'Sompur Mahavihara', nameBN: 'সোমপুর মহাবিহার', mainImage: `${local}sompur%20bihar.jpg`, sliderImages: [`${local}sompur%20bihar.jpg`], location: 'Naogaon', locationBN: 'নওগাঁ', lat: 25.0323, lng: 88.9769, description: 'An ancient Buddhist monastery.', descriptionBN: 'প্রাচীন বৌদ্ধ বিহার।', bestVisitingTime: 'Winter', estimatedBudget: '3000 BDT', nearbyHotels: 'Naogaon Motel', safetyTips: 'Respect the site.' },
+      { name: 'Bhawal National Park', nameBN: 'ভাওয়াল জাতীয় উদ্যান', mainImage: `${local}bhawal%20national%20park.jpg`, sliderImages: [`${local}bhawal%20national%20park.jpg`], location: 'Gazipur', locationBN: 'গাজীপুর', lat: 24.0617, lng: 90.4024, description: 'Beautiful Sal forests.', descriptionBN: 'ঘন শালবনের চমৎকার স্পট।', bestVisitingTime: 'Winter', estimatedBudget: '1000 BDT', nearbyHotels: 'Sarah Resort', safetyTips: 'Don\'t go deep alone.' },
+      { name: 'Safari Park', nameBN: 'সাফারি পার্ক', mainImage: `${local}safari%20park.jpg`, sliderImages: [`${local}safari%20park.jpg`], location: 'Gazipur', locationBN: 'গাজীপুর', lat: 24.1839, lng: 90.3957, description: 'A massive wildlife park.', descriptionBN: 'একটি বিশাল বন্যপ্রাণী পার্ক।', bestVisitingTime: 'Winter', estimatedBudget: '2000 BDT', nearbyHotels: 'Atlantis Resort', safetyTips: 'Stay inside the safari bus.' },
+      { name: 'Jaflong', nameBN: 'জাফলং', mainImage: `${local}jaflong.jpg`, sliderImages: [`${local}jaflong.jpg`], location: 'Sylhet', locationBN: 'সিলেট', lat: 25.1634, lng: 92.0151, description: 'Renowned for its stone collections and clear river water.', descriptionBN: 'পাথর সংগ্রহ এবং স্বচ্ছ নদীর পানির জন্য পরিচিত।', bestVisitingTime: 'Autumn', estimatedBudget: '4000 BDT', nearbyHotels: 'Jaflong Inn', safetyTips: 'Do not cross the border.' }
     ];
 
     await Spot.insertMany(premiumSpots);

@@ -19,6 +19,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import About from './pages/About'; 
 import TourPackages from './pages/TourPackages'; 
+import Leaderboard from './pages/Leaderboard'; // 🟢 লিডারবোর্ড ইম্পোর্ট করা হলো
 
 // ==========================================
 // 🔒 PrivateRoute
@@ -57,6 +58,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/packages" element={<TourPackages />} /> 
+              <Route path="/leaderboard" element={<Leaderboard />} /> {/* 🟢 লিডারবোর্ডের রাউট যোগ করা হলো */}
 
               {/* Private Routes */}
               <Route path="/country/bangladesh" element={<PrivateRoute><Bangladesh /></PrivateRoute>} />

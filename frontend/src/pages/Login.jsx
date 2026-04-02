@@ -22,9 +22,11 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ টোকেন এবং ইউজারের রোল localStorage-এ সেভ করা হচ্ছে
+        // ✅ টোকেন, রোল, নাম এবং আইডি localStorage-এ সেভ করা হচ্ছে
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.user.role); 
+        localStorage.setItem('userId', data.user._id); // 🟢 পয়েন্টের জন্য আইডি সেভ হলো
+        localStorage.setItem('name', data.user.name);  // 🟢 রিভিউতে দেখানোর জন্য নাম সেভ হলো
 
         alert('Login Successful! 🧞‍♂️');
 
