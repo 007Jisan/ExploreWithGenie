@@ -84,6 +84,9 @@ const Navbar = () => {
             <Link to="/leaderboard" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
               {t('navLeaderboard')}
             </Link>
+            <Link to="/packages" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
+              {language === 'bn' ? 'ট্যুর প্যাকেজ' : 'Tour Packages'}
+            </Link>
             <Link to="/about" className="text-[#d9dde6] text-[15px] font-extrabold uppercase tracking-wide hover:text-white">
               {t('navAbout')}
             </Link>
@@ -99,71 +102,71 @@ const Navbar = () => {
             {language === 'en' ? 'বাংলা' : 'English'}
           </button>
 
-        {token ? (
-          <div className="relative">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-[44px] h-[44px] rounded-full bg-[#0b8b70] flex items-center justify-center overflow-hidden shadow-sm ring-2 ring-[#9af2dd]/30"
-            >
-              {getProfileImage() ? (
-                <img
-                  src={getProfileImage()}
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    const fallback = e.currentTarget.nextElementSibling;
-                    if (fallback) fallback.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <span
-                style={{ display: getProfileImage() ? 'none' : 'flex' }}
-                className="w-full h-full items-center justify-center text-white text-xs font-black tracking-wide bg-gradient-to-br from-[#14c79a] to-[#0b8b70]"
+          {token ? (
+            <div className="relative">
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-[44px] h-[44px] rounded-full bg-[#0b8b70] flex items-center justify-center overflow-hidden shadow-sm ring-2 ring-[#9af2dd]/30"
               >
-                {getInitials()}
-              </span>
-            </button>
+                {getProfileImage() ? (
+                  <img
+                    src={getProfileImage()}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <span
+                  style={{ display: getProfileImage() ? 'none' : 'flex' }}
+                  className="w-full h-full items-center justify-center text-white text-xs font-black tracking-wide bg-gradient-to-br from-[#14c79a] to-[#0b8b70]"
+                >
+                  {getInitials()}
+                </span>
+              </button>
 
-            {isDropdownOpen && (
-              <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl py-2 text-gray-700 border border-gray-100">
-                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
-                  <p className="text-xs font-black text-[#0a192f] truncate">{userData?.name || 'Explorer'}</p>
-                  <p className="text-[10px] text-[#00b894] font-bold uppercase tracking-widest">{userRole}</p>
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl py-2 text-gray-700 border border-gray-100">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
+                    <p className="text-xs font-black text-[#0a192f] truncate">{userData?.name || 'Explorer'}</p>
+                    <p className="text-[10px] text-[#00b894] font-bold uppercase tracking-widest">{userRole}</p>
+                  </div>
+
+                  {userRole === 'admin' && (
+                    <Link to="/admin" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
+                      Admin Panel
+                    </Link>
+                  )}
+
+                  {userRole === 'agency' && (
+                    <Link to="/agency-dashboard" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
+                      Agency Dashboard
+                    </Link>
+                  )}
+
+                  <Link to="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
+                    My Profile
+                  </Link>
+
+                  <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-bold text-xs">
+                    Log Out
+                  </button>
                 </div>
-
-                {userRole === 'admin' && (
-                  <Link to="/admin" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
-                    Admin Panel
-                  </Link>
-                )}
-
-                {userRole === 'agency' && (
-                  <Link to="/agency-dashboard" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
-                    Agency Dashboard
-                  </Link>
-                )}
-
-                <Link to="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-3 hover:bg-slate-50 font-bold text-xs">
-                  My Profile
-                </Link>
-
-                <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-bold text-xs">
-                  Log Out
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <Link to="/login" className="text-white font-bold text-sm">
-              {t('login')}
-            </Link>
-            <Link to="/signup" className="bg-[#22d3a8] text-[#12233c] px-5 py-2 rounded-full font-bold text-sm">
-              {t('signup')}
-            </Link>
-          </>
-        )}
+              )}
+            </div>
+          ) : (
+            <>
+              <Link to="/login" className="text-white font-bold text-sm">
+                {t('login')}
+              </Link>
+              <Link to="/signup" className="bg-[#22d3a8] text-[#12233c] px-5 py-2 rounded-full font-bold text-sm">
+                {t('signup')}
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>

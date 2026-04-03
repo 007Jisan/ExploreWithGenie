@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -16,6 +16,9 @@ const Profile = () => {
     bio: '',
     profilePicture: '',
     points: 0,
+    budgetPreference: '',
+    tripDurationPreference: '',
+    interests: [],
   });
   const [isEditing, setIsEditing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -23,6 +26,7 @@ const Profile = () => {
   const [experienceStatus, setExperienceStatus] = useState('');
   const [experienceError, setExperienceError] = useState('');
   const [experiences, setExperiences] = useState([]);
+  const [myBookings, setMyBookings] = useState([]);
   const [experienceForm, setExperienceForm] = useState({
     title: '',
     location: '',
@@ -41,7 +45,9 @@ const Profile = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        if (res.ok) setUser(data);
+        if (res.ok) {
+          setUser(data);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -53,20 +59,37 @@ const Profile = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        if (res.ok) setExperiences(data);
+        if (res.ok) {
+          setExperiences(data);
+        }
       } catch (err) {
         console.error(err);
       }
     };
 
+    const fetchBookings = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/bookings/my-bookings', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setMyBookings(data);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+      }
+    };
+
     fetchProfile();
     fetchExperiences();
+    fetchBookings();
   }, [token, navigate]);
 
   const handleSave = async (e) => {
     e.preventDefault();
     setStatusMessage('');
     setErrorMessage('');
+
     try {
       const res = await fetch('http://localhost:5000/api/auth/profile', {
         method: 'PUT',
@@ -89,15 +112,17 @@ const Profile = () => {
                 .filter(Boolean),
         }),
       });
+
       const data = await res.json();
-      if (res.ok) {
-        setUser(data);
-        setIsEditing(false);
-        setStatusMessage(t('profileUpdated'));
-        window.dispatchEvent(new Event('profile-updated'));
-      } else {
+      if (!res.ok) {
         setErrorMessage(data.message || 'Profile update failed.');
+        return;
       }
+
+      setUser(data);
+      setIsEditing(false);
+      setStatusMessage(t('profileUpdated'));
+      window.dispatchEvent(new Event('profile-updated'));
     } catch (err) {
       setErrorMessage('Save failed.');
     }
@@ -117,14 +142,15 @@ const Profile = () => {
         body: formData,
       });
       const data = await res.json();
-      if (res.ok) {
-        setUser((prev) => ({ ...prev, profilePicture: data.imageUrl }));
-        setStatusMessage(t('profilePictureUpdated'));
-        setErrorMessage('');
-        window.dispatchEvent(new Event('profile-updated'));
-      } else {
+      if (!res.ok) {
         setErrorMessage(data.message || 'Upload failed.');
+        return;
       }
+
+      setUser((prev) => ({ ...prev, profilePicture: data.imageUrl }));
+      setStatusMessage(t('profilePictureUpdated'));
+      setErrorMessage('');
+      window.dispatchEvent(new Event('profile-updated'));
     } catch (err) {
       setErrorMessage('Avatar upload failed.');
     }
@@ -145,15 +171,17 @@ const Profile = () => {
         body: JSON.stringify(experienceForm),
       });
       const data = await res.json();
-      if (res.ok) {
-        setExperiences((prev) => [data.experience, ...prev]);
-        setExperienceForm({ title: '', location: '', story: '' });
-        setExperienceStatus(data.message || 'Travel experience shared successfully.');
-        setUser((prev) => ({ ...prev, points: data.totalPoints ?? prev.points }));
-        window.dispatchEvent(new Event('profile-updated'));
-      } else {
+
+      if (!res.ok) {
         setExperienceError(data.message || 'Failed to share experience.');
+        return;
       }
+
+      setExperiences((prev) => [data.experience, ...prev]);
+      setExperienceForm({ title: '', location: '', story: '' });
+      setExperienceStatus(data.message || 'Travel experience shared successfully.');
+      setUser((prev) => ({ ...prev, points: data.totalPoints ?? prev.points }));
+      window.dispatchEvent(new Event('profile-updated'));
     } catch (err) {
       setExperienceError('Failed to share experience.');
     }
@@ -197,6 +225,7 @@ const Profile = () => {
               {errorMessage}
             </div>
           )}
+
           <form onSubmit={handleSave} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-3">
@@ -219,6 +248,7 @@ const Profile = () => {
                 />
               </div>
             </div>
+
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t('currentAddress')}</label>
               <input
@@ -229,6 +259,7 @@ const Profile = () => {
                 className="w-full px-8 py-5 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-[#00df9a] outline-none transition-all font-bold text-[#0a192f] disabled:bg-slate-50/50"
               />
             </div>
+
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">{t('travelerBio')}</label>
               <textarea
@@ -297,9 +328,7 @@ const Profile = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
             <div>
               <h2 className="text-3xl font-black text-[#0a192f] tracking-tight">Share Travel Experience</h2>
-              <p className="text-slate-500 font-semibold mt-2">
-                Post your travel story and earn 15 XP automatically.
-              </p>
+              <p className="text-slate-500 font-semibold mt-2">Post your travel story and earn 15 XP automatically.</p>
             </div>
             <div className="bg-[#00df9a]/10 text-[#0a192f] px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">
               Rewards Active
@@ -342,10 +371,7 @@ const Profile = () => {
               className="w-full px-6 py-5 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-[#00df9a] outline-none font-bold text-[#0a192f] resize-none"
             />
             <div className="flex justify-end">
-              <button
-                type="submit"
-                className="bg-[#0a192f] text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#00df9a] hover:text-[#0a192f] transition-all"
-              >
+              <button type="submit" className="bg-[#0a192f] text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#00df9a] hover:text-[#0a192f] transition-all">
                 Post Experience
               </button>
             </div>
@@ -376,6 +402,48 @@ const Profile = () => {
             )}
           </div>
         </div>
+
+        {String(user.role || '').toLowerCase() === 'tourist' && (
+          <div className="bg-white rounded-[2.5rem] p-12 shadow-xl border border-slate-100">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+              <h2 className="text-2xl font-bold text-[#0a192f]">My Booking History</h2>
+            </div>
+
+            {myBookings.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                <p className="text-gray-500 font-medium">You haven't booked any packages yet.</p>
+                <button onClick={() => navigate('/packages')} className="mt-4 text-[#00df9a] font-bold hover:underline">
+                  Explore Packages
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myBookings.map((booking) => (
+                  <div key={booking._id} className="flex flex-col sm:flex-row justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
+                    <div className="mb-3 sm:mb-0 text-center sm:text-left">
+                      <h3 className="font-bold text-lg text-[#0a192f]">{booking.package?.title || 'Unknown Package'}</h3>
+                      <p className="text-sm text-gray-500">Agency: {booking.agency?.name || 'Unknown agency'}</p>
+                      <p className="text-xs text-gray-400 mt-1">Booked on: {new Date(booking.createdAt).toLocaleDateString()}</p>
+                    </div>
+
+                    <div className="flex flex-col items-center sm:items-end">
+                      <span className="font-bold text-[#0a192f] mb-1">৳{booking.package?.price || '0'}</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        booking.status === 'Approved'
+                          ? 'bg-green-100 text-green-700'
+                          : booking.status === 'Rejected'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {booking.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

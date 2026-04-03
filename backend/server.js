@@ -20,10 +20,14 @@ app.use('/images', express.static(path.join(__dirname, 'public/images')));
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const agencyRoutes = require('./routes/agencyRoutes');
+const packageRoutes = require('./routes/packageRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/agency', agencyRoutes);
+app.use('/api/packages', packageRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 const openaiConfig = {
   apiKey: process.env.OPENAI_API_KEY,
@@ -31,6 +35,8 @@ const openaiConfig = {
 
 if (process.env.OPENAI_BASE_URL) {
   openaiConfig.baseURL = process.env.OPENAI_BASE_URL;
+} else {
+  openaiConfig.baseURL = 'https://openrouter.ai/api/v1';
 }
 
 const openai = new OpenAI(openaiConfig);

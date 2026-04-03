@@ -16,6 +16,7 @@ import AgencyDashboard from './pages/AgencyDashboard';
 import About from './pages/About';
 import Leaderboard from './pages/Leaderboard';
 import SpotDetails from './pages/SpotDetails';
+import TourPackages from './pages/TourPackages';
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -46,6 +47,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/packages" element={<TourPackages />} />
 
               <Route
                 path="/country/bangladesh"
