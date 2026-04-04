@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Spot = require('../models/Spot');
 const Experience = require('../models/Experience');
 const jwt = require('jsonwebtoken');
+const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const BADGE_RULES = [
   { threshold: 30, badge: 'Bronze Traveler' },
@@ -68,16 +69,17 @@ const getRecommendationScore = (spot, preferences) => {
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email and password are required.' });
     }
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: normalizedEmail });
     if (user) return res.status(400).json({ message: 'User already exists' });
 
     user = new User({
-      name,
-      email,
+      name: String(name).trim(),
+      email: normalizedEmail,
       password,
       role: role || 'tourist',
       points: 0,
@@ -94,10 +96,18 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    let user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      user = await User.findOne({
+        email: { $regex: `^${escapeRegExp(normalizedEmail)}$`, $options: 'i' },
+      });
+    }
+
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await user.comparePassword(String(password || ''));
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const payload = {
@@ -201,43 +211,94 @@ exports.getLeaderboard = async (req, res) => {
     monthStart.setHours(0, 0, 0, 0);
 
     const monthlyReviewMap = new Map();
+    const allTimeReviewMap = new Map();
+    const allTimeExperienceMap = new Map();
 
     spots.forEach((spot) => {
       (spot.reviews || []).forEach((review) => {
+        const key = String(review.user || '');
+        if (!key) return;
+
+        allTimeReviewMap.set(key, (allTimeReviewMap.get(key) || 0) + 1);
+
         const createdAt = new Date(review.createdAt || review.date || Date.now());
         if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
 
-        const key = String(review.user);
         monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1);
       });
     });
 
     usersWithAgencyReviews.forEach((agency) => {
       (agency.agencyReviews || []).forEach((review) => {
+        const key = String(review.user || '');
+        if (!key) return;
+
+        allTimeReviewMap.set(key, (allTimeReviewMap.get(key) || 0) + 1);
+
         const createdAt = new Date(review.createdAt || Date.now());
         if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
 
-        const key = String(review.user);
         monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1);
       });
     });
 
     experiences.forEach((experience) => {
+      const key = String(experience.user || '');
+      if (!key) return;
+
+      allTimeExperienceMap.set(key, (allTimeExperienceMap.get(key) || 0) + 1);
+
       const createdAt = new Date(experience.createdAt || Date.now());
       if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
 
-      const key = String(experience.user);
       monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1.5);
     });
+
+    // Keep DB points in sync with stored activities to avoid zero-score leaderboards.
+    const syncOps = [];
+    topUsers.forEach((user) => {
+      const key = String(user._id);
+      const computedPoints =
+        (allTimeReviewMap.get(key) || 0) * 10 + (allTimeExperienceMap.get(key) || 0) * 15;
+
+      if (computedPoints > (user.points || 0)) {
+        const nextBadges = Array.isArray(user.badges) ? [...user.badges] : [];
+        BADGE_RULES.forEach(({ threshold, badge }) => {
+          if (computedPoints >= threshold && !nextBadges.includes(badge)) {
+            nextBadges.push(badge);
+          }
+        });
+
+        user.points = computedPoints;
+        user.badges = nextBadges;
+
+        syncOps.push({
+          updateOne: {
+            filter: { _id: user._id },
+            update: { $set: { points: computedPoints, badges: nextBadges } },
+          },
+        });
+      }
+    });
+
+    if (syncOps.length) {
+      await User.bulkWrite(syncOps);
+    }
 
     const rankedUsers = topUsers
       .map((user) => ({
         ...user,
         monthlyPoints: Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10),
+        leaderboardPoints:
+          Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10) > 0
+            ? Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10)
+            : (user.points || 0),
       }))
       .filter((user) => user.role === 'tourist')
       .sort((a, b) => {
-        if (b.monthlyPoints !== a.monthlyPoints) return b.monthlyPoints - a.monthlyPoints;
+        if (b.leaderboardPoints !== a.leaderboardPoints) {
+          return b.leaderboardPoints - a.leaderboardPoints;
+        }
         if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
         return new Date(a.createdAt) - new Date(b.createdAt);
       })
@@ -267,8 +328,11 @@ exports.addPoints = async (req, res) => {
 exports.addReviewAndPoints = async (req, res) => {
   try {
     const { spotId, rating, comment } = req.body;
-    const userId = req.user.id;
+    const userId = req.user?._id || req.user?.id;
     const parsedRating = Number(rating);
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized review request.' });
+    }
 
     if (!spotId || !parsedRating || !comment || !comment.trim()) {
       return res.status(400).json({ message: 'Spot, rating and comment are required.' });

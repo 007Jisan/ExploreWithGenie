@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createPackage, getAgencyPackages, getAllPackages, updatePackage, deletePackage } = require('../controllers/packageController'); 
-const protect = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 // এজেন্সির রাউট 
 router.post('/create', protect, createPackage);

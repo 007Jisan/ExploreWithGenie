@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createBooking, getUserBookings, getAgencyBookings, updateBookingStatus } = require('../controllers/bookingController');
-const protect = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 router.post('/create', protect, createBooking);
 router.get('/my-bookings', protect, getUserBookings);

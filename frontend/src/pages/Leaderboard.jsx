@@ -50,7 +50,7 @@ const Leaderboard = () => {
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest">Rank</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest">Explorer</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-center">Badges</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-right">Monthly XP</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-right">Contribution XP</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -111,7 +111,7 @@ const Leaderboard = () => {
                     </td>
                     <td className="px-8 py-6 text-right">
                       <span className="text-[#0a192f] font-black text-lg tabular-nums">
-                        {(user.monthlyPoints || 0).toLocaleString()} <span className="text-[10px] text-[#00df9a]">XP</span>
+                        {((user.leaderboardPoints ?? user.monthlyPoints ?? user.points) || 0).toLocaleString()} <span className="text-[10px] text-[#00df9a]">XP</span>
                       </span>
                     </td>
                   </tr>

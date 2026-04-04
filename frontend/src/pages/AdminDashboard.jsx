@@ -235,7 +235,7 @@ const AdminDashboard = () => {
             </p>
           </div>
           <div className="bg-red-50 text-red-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-red-100 shadow-sm">
-            Root Access
+            Admin Access
           </div>
         </div>
 

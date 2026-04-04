@@ -14,7 +14,7 @@ const Login = () => {
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await response.json();
@@ -22,7 +22,8 @@ const Login = () => {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.user.role);
-        localStorage.setItem('userId', data.user.id);
+        localStorage.setItem('userId', data.user.id || data.user._id || '');
+        localStorage.setItem('name', data.user.name || '');
 
         if (data.user.role === 'admin') {
           window.location.href = '/admin';
