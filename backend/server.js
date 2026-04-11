@@ -5,30 +5,21 @@ const dotenv = require('dotenv');
 const { OpenAI } = require('openai');
 const path = require('path');
 
+// 1. LOAD ENVIRONMENT VARIABLES FIRST
+dotenv.config();
+
 const Spot = require('./models/Spot');
 const seedSpots = require('./data/seedSpots');
 
-dotenv.config();
-
 const app = express();
 
+// 2. MIDDLEWARE
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-const authRoutes = require('./routes/authRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const agencyRoutes = require('./routes/agencyRoutes');
-const packageRoutes = require('./routes/packageRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
-
-app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/agency', agencyRoutes);
-app.use('/api/packages', packageRoutes);
-app.use('/api/bookings', bookingRoutes);
-
+// 3. CONFIGURE OPENAI IMMEDIATELY AFTER DOTENV
 const openaiConfig = {
   apiKey: process.env.OPENAI_API_KEY,
 };
@@ -41,11 +32,30 @@ if (process.env.OPENAI_BASE_URL) {
 
 const openai = new OpenAI(openaiConfig);
 
+// 4. ROUTES
+const authRoutes = require('./routes/authRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const agencyRoutes = require('./routes/agencyRoutes');
+const packageRoutes = require('./routes/packageRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
+
+// ✅ EXISTING ROUTES
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/agency', agencyRoutes);
+app.use('/api/packages', packageRoutes);
+app.use('/api/bookings', bookingRoutes);
+
+// ✅ NEW REVIEW ROUTE (NO CONFLICT)
+app.use('/api/reviews', require('./routes/reviewRoutes'));
+
+// 5. CHAT ENDPOINT
 app.post('/api/chat', async (req, res) => {
   const { message, language = 'en' } = req.body;
 
   try {
     const targetLanguage = language === 'bn' ? 'Bengali' : 'English';
+
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: [
@@ -59,6 +69,8 @@ app.post('/api/chat', async (req, res) => {
 
     res.json({ reply: completion.choices[0].message.content });
   } catch (error) {
+    console.error("OpenAI Error:", error);
+
     res.json({
       reply:
         language === 'bn'
@@ -68,6 +80,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// 6. SPOT ENDPOINTS
 app.get('/api/spots', async (req, res) => {
   try {
     const spots = await Spot.find().sort({ createdAt: -1 });
@@ -80,10 +93,7 @@ app.get('/api/spots', async (req, res) => {
 app.get('/api/spots/:id', async (req, res) => {
   try {
     const spot = await Spot.findById(req.params.id);
-    if (!spot) {
-      return res.status(404).json({ message: 'Spot not found' });
-    }
-
+    if (!spot) return res.status(404).json({ message: 'Spot not found' });
     res.json(spot);
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
@@ -94,16 +104,20 @@ app.get('/api/seed-spots', async (req, res) => {
   try {
     await Spot.deleteMany({});
     await Spot.insertMany(seedSpots);
-    res.send(`${seedSpots.length} tourist spots reseeded successfully with local original images.`);
+    res.send(`${seedSpots.length} tourist spots reseeded successfully.`);
   } catch (error) {
     res.status(500).send(`Error: ${error.message}`);
   }
 });
 
+// 7. DATABASE & SERVER START
 mongoose
   .connect(process.env.MONGO_URL)
-  .then(() => console.log('MongoDB Connected'))
-  .catch((err) => console.error('Database connection failed:', err));
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  .then(() => {
+    console.log('MongoDB Connected');
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  })
+  .catch((err) => {
+    console.error('Database connection failed:', err);
+  });
