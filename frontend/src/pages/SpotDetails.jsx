@@ -183,7 +183,9 @@ const SpotDetails = () => {
             to="/country/bangladesh"
             className="group inline-flex items-center gap-2 text-[#0a192f] font-black text-[10px] uppercase tracking-widest hover:text-[#00df9a] transition-all"
           >
-            <span className="text-lg group-hover:-translate-x-1 transition-transform">←</span>
+            <span className="text-lg group-hover:-translate-x-1 transition-transform">
+              {'\u2190'}
+            </span>
             {t('backToDestinations')}
           </Link>
           <div className="bg-white text-amber-500 px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-amber-100 shadow-sm">
@@ -217,20 +219,26 @@ const SpotDetails = () => {
               <h1 className="text-6xl md:text-7xl font-black text-[#0a192f] mb-8 tracking-tighter leading-[0.9]">
                 {spot.name}
               </h1>
-              <p className="text-slate-400 text-lg leading-relaxed mb-12 font-medium">{spot.description}</p>
+              <p className="text-slate-400 text-lg leading-relaxed mb-12 font-medium">
+                {spot.description}
+              </p>
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                     {t('budget')}
                   </p>
-                  <p className="text-[#0a192f] font-black text-xl leading-none">{spot.estimatedBudget}</p>
+                  <p className="text-[#0a192f] font-black text-xl leading-none">
+                    {spot.estimatedBudget}
+                  </p>
                 </div>
                 <div className="bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                     {t('bestTime')}
                   </p>
-                  <p className="text-[#0a192f] font-black text-xl leading-none">{spot.bestVisitingTime}</p>
+                  <p className="text-[#0a192f] font-black text-xl leading-none">
+                    {spot.bestVisitingTime}
+                  </p>
                 </div>
               </div>
             </div>
@@ -241,7 +249,9 @@ const SpotDetails = () => {
           <div className="lg:col-span-8 space-y-10">
             <div className="bg-[#0a192f] p-10 rounded-[4rem] shadow-2xl relative overflow-hidden group">
               <div className="flex justify-between items-center mb-8">
-                <h3 className="text-white font-black text-xl tracking-tight">{t('interactiveRouteMap')}</h3>
+                <h3 className="text-white font-black text-xl tracking-tight">
+                  {t('interactiveRouteMap')}
+                </h3>
               </div>
               <div className="h-[500px] rounded-[3rem] overflow-hidden shadow-inner ring-8 ring-white/5">
                 <MapComponent lat={spot.lat} lng={spot.lng} destinationLabel={spot.name} />
@@ -250,14 +260,26 @@ const SpotDetails = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
-                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl mb-6">🏨</div>
-                <h4 className="text-[#0a192f] font-black text-xs uppercase tracking-[0.2em] mb-4">{t('nearbyHotels')}</h4>
-                <p className="text-slate-400 text-sm font-bold leading-relaxed">{spot.nearbyHotels}</p>
+                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl mb-6">
+                  {'\ud83c\udfe8'}
+                </div>
+                <h4 className="text-[#0a192f] font-black text-xs uppercase tracking-[0.2em] mb-4">
+                  {t('nearbyHotels')}
+                </h4>
+                <p className="text-slate-400 text-sm font-bold leading-relaxed">
+                  {spot.nearbyHotels}
+                </p>
               </div>
               <div className="bg-rose-50/30 p-10 rounded-[3rem] border border-rose-100 shadow-sm">
-                <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-2xl mb-6">🛡️</div>
-                <h4 className="text-rose-600 font-black text-xs uppercase tracking-[0.2em] mb-4">{t('safetyProtocols')}</h4>
-                <p className="text-rose-900/70 text-sm font-bold leading-relaxed">{spot.safetyTips}</p>
+                <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-2xl mb-6">
+                  {'\ud83d\udee1\ufe0f'}
+                </div>
+                <h4 className="text-rose-600 font-black text-xs uppercase tracking-[0.2em] mb-4">
+                  {t('safetyProtocols')}
+                </h4>
+                <p className="text-rose-900/70 text-sm font-bold leading-relaxed">
+                  {spot.safetyTips}
+                </p>
               </div>
             </div>
 
@@ -281,18 +303,24 @@ const SpotDetails = () => {
                     const averageRating =
                       agencyReviews.length > 0
                         ? (
-                            agencyReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) /
-                            agencyReviews.length
+                            agencyReviews.reduce(
+                              (sum, review) => sum + Number(review.rating || 0),
+                              0
+                            ) / agencyReviews.length
                           ).toFixed(1)
                         : null;
 
                     return (
-                      <div key={pkg._id} className="border border-slate-100 rounded-2xl p-5 bg-slate-50">
+                      <div
+                        key={pkg._id}
+                        className="border border-slate-100 rounded-2xl p-5 bg-slate-50"
+                      >
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-3">
                           <div>
                             <h4 className="text-lg font-black text-[#0a192f]">{pkg.title}</h4>
                             <p className="text-sm text-slate-500">
-                              {pkg.location} • {pkg.duration} • {t('hostedBy')} {pkg.agency?.name || 'Agency'}
+                              {pkg.location} {'\u2022'} {pkg.duration} {'\u2022'} {t('hostedBy')}{' '}
+                              {pkg.agency?.name || 'Agency'}
                             </p>
                             {averageRating && (
                               <p className="text-sm text-amber-500 font-bold mt-2">
@@ -304,7 +332,8 @@ const SpotDetails = () => {
                         </div>
                         <p className="text-sm text-slate-600 mb-4">{pkg.description}</p>
                         <p className="text-sm text-slate-500 mb-4">
-                          {t('hotelPricing')}: {pkg.hotelPricing || 'Contact agency for hotel details.'}
+                          {t('hotelPricing')}:{' '}
+                          {pkg.hotelPricing || 'Contact agency for hotel details.'}
                         </p>
 
                         <textarea
@@ -324,17 +353,24 @@ const SpotDetails = () => {
                         </button>
 
                         <div className="mt-6 border-t border-slate-200 pt-5">
-                          <h5 className="text-lg font-black text-[#0a192f] mb-4">{t('agencyReviewTitle')}</h5>
+                          <h5 className="text-lg font-black text-[#0a192f] mb-4">
+                            {t('agencyReviewTitle')}
+                          </h5>
 
                           <div className="space-y-3 mb-4">
                             {agencyReviews.length > 0 ? (
                               agencyReviews.slice(0, 3).map((review) => (
-                                <div key={review._id || `${review.user}-${review.createdAt}`} className="bg-white rounded-xl p-4 border border-slate-200">
+                                <div
+                                  key={review._id || `${review.user}-${review.createdAt}`}
+                                  className="bg-white rounded-xl p-4 border border-slate-200"
+                                >
                                   <div className="flex items-center justify-between">
-                                    <p className="font-black text-[#0a192f]">{review.userName}</p>
+                                    <p className="font-black text-[#0a192f]">
+                                      {review.userName}
+                                    </p>
                                     <p className="text-amber-500 text-sm">
-                                      {'★'.repeat(review.rating)}
-                                      {'☆'.repeat(5 - review.rating)}
+                                      {'\u2605'.repeat(review.rating)}
+                                      {'\u2606'.repeat(5 - review.rating)}
                                     </p>
                                   </div>
                                   <p className="text-sm text-slate-600 mt-2">{review.comment}</p>
@@ -351,7 +387,9 @@ const SpotDetails = () => {
                             </div>
                           ) : (
                             <div className="space-y-3">
-                              <label className="block text-sm font-black text-[#0a192f]">{t('reviewThisAgency')}</label>
+                              <label className="block text-sm font-black text-[#0a192f]">
+                                {t('reviewThisAgency')}
+                              </label>
                               <select
                                 value={agencyRatings[pkg.agency?._id] || 5}
                                 onChange={(e) =>
@@ -401,17 +439,36 @@ const SpotDetails = () => {
 
           <div className="lg:col-span-4 sticky top-28">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-2xl font-black text-[#0a192f] tracking-tighter">{t('feedback')}</h3>
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Module 2</span>
+              <h3 className="text-2xl font-black text-[#0a192f] tracking-tighter">
+                {t('feedback')}
+              </h3>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                Module 2
+              </span>
             </div>
             <ReviewSection
               spotId={spot._id}
               existingReviews={sortedReviews}
               onReviewCreated={(review) =>
-                setSpot((prev) => ({
-                  ...prev,
-                  reviews: [review, ...(prev.reviews || [])],
-                }))
+                setSpot((prev) => {
+                  if (!prev) return prev;
+
+                  const reviews = Array.isArray(prev.reviews) ? [...prev.reviews] : [];
+                  const existingIndex = reviews.findIndex(
+                    (item) => String(item.user) === String(review.user)
+                  );
+
+                  if (existingIndex >= 0) {
+                    reviews[existingIndex] = { ...reviews[existingIndex], ...review };
+                  } else {
+                    reviews.unshift(review);
+                  }
+
+                  return {
+                    ...prev,
+                    reviews,
+                  };
+                })
               }
             />
           </div>

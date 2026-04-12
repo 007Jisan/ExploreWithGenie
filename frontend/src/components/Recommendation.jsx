@@ -1,27 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { clearStoredAuth, getValidToken } from '../utils/auth';
 
+// Eshita's Task: Personalized destination recommendations
+// This component collects preference inputs, saves them to user profile,
+// then fetches ranked recommendations from backend scoring logic.
 const Recommendation = ({ initialPreferences = {} }) => {
-  const token = localStorage.getItem('token');
+  const token = getValidToken();
   const { t } = useLanguage();
-  const [preferences, setPreferences] = useState({
-    budgetPreference: initialPreferences.budgetPreference || 'Medium',
-    tripDurationPreference: initialPreferences.tripDurationPreference || '1-3 Days',
+  const buildPreferenceState = (source = {}) => ({
+    budgetPreference: source.budgetPreference || 'Medium',
+    tripDurationPreference: source.tripDurationPreference || '1-3 Days',
     interests:
-      Array.isArray(initialPreferences.interests) && initialPreferences.interests.length > 0
-        ? initialPreferences.interests.join(', ')
+      Array.isArray(source.interests) && source.interests.length > 0
+        ? source.interests.join(', ')
         : 'History, Nature',
+  });
+  const [preferences, setPreferences] = useState({
+    ...buildPreferenceState(initialPreferences),
   });
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const preferenceSnapshot = JSON.stringify(buildPreferenceState(initialPreferences));
+
+  useEffect(() => {
+    setPreferences(JSON.parse(preferenceSnapshot));
+  }, [preferenceSnapshot]);
 
   const getRecommendations = async (e) => {
     e.preventDefault();
     if (!token) {
-      setError('Please login first to get personalized recommendations.');
+      setError('Your session has expired. Please log in again.');
       return;
     }
 
@@ -30,6 +42,7 @@ const Recommendation = ({ initialPreferences = {} }) => {
     setError('');
 
     try {
+      // Step 1: Persist current preference selections for this logged-in user.
       const saveRes = await fetch('http://localhost:5000/api/auth/preferences', {
         method: 'PUT',
         headers: {
@@ -47,16 +60,28 @@ const Recommendation = ({ initialPreferences = {} }) => {
       });
 
       const saveData = await saveRes.json();
+      if (saveRes.status === 401) {
+        clearStoredAuth();
+        setError('Your session has expired. Please log in again.');
+        setLoading(false);
+        return;
+      }
       if (!saveRes.ok) {
         setError(saveData.message || 'Could not save travel preferences.');
         setLoading(false);
         return;
       }
 
+      // Step 2: Request personalized spot matches based on saved preferences.
       const recommendationRes = await fetch('http://localhost:5000/api/auth/recommendations', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const recommendationData = await recommendationRes.json();
+      if (recommendationRes.status === 401) {
+        clearStoredAuth();
+        setError('Your session has expired. Please log in again.');
+        return;
+      }
 
       if (recommendationRes.ok) {
         setRecommendations(recommendationData);
@@ -152,9 +177,9 @@ const Recommendation = ({ initialPreferences = {} }) => {
       )}
 
       {recommendations.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mt-6 justify-items-center">
           {recommendations.map((spot) => (
-            <div key={spot._id} className="bg-slate-50 rounded-[1.5rem] overflow-hidden border border-slate-200">
+            <div key={spot._id} className="w-full max-w-[360px] bg-slate-50 rounded-[1.5rem] overflow-hidden border border-slate-200">
               <img src={spot.mainImage} alt={spot.name} className="w-full h-44 object-cover" />
               <div className="p-5">
                 <div className="flex items-center justify-between gap-3">

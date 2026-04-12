@@ -17,14 +17,15 @@ import About from './pages/About';
 import Leaderboard from './pages/Leaderboard';
 import SpotDetails from './pages/SpotDetails';
 import TourPackages from './pages/TourPackages';
+import { getValidToken } from './utils/auth';
 
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
+  const token = getValidToken();
   return token ? children : <Navigate to="/login" replace />;
 };
 
 const RoleRoute = ({ children, allowedRoles }) => {
-  const token = localStorage.getItem('token');
+  const token = getValidToken();
   const userRole = localStorage.getItem('role');
 
   if (!token) return <Navigate to="/login" replace />;

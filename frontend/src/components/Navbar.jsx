@@ -1,29 +1,44 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { clearStoredAuth, getValidToken } from '../utils/auth';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { language, changeLanguage, t } = useLanguage();
-  const token = localStorage.getItem('token');
+  const token = getValidToken();
   const userRole = (localStorage.getItem('role') || 'tourist').toLowerCase();
   const [userData, setUserData] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const fetchUser = async () => {
-    if (!token) return;
+    if (!token) {
+      setUserData(null);
+      return;
+    }
+
     try {
       const res = await fetch('http://localhost:5000/api/auth/profile', {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (res.status === 401) {
+        clearStoredAuth();
+        setUserData(null);
+        setIsDropdownOpen(false);
+        navigate('/login', { replace: true });
+        return;
+      }
+
       const data = await res.json();
-      if (res.ok) setUserData(data);
+      if (res.ok) {
+        setUserData(data);
+      }
     } catch (err) {
       console.error('Navbar sync error:', err);
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchUser();
     window.addEventListener('profile-updated', fetchUser);
@@ -31,9 +46,7 @@ const Navbar = () => {
   }, [token]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('userId');
+    clearStoredAuth();
     setIsDropdownOpen(false);
     navigate('/login');
     window.location.reload();
@@ -131,8 +144,12 @@ const Navbar = () => {
               {isDropdownOpen && (
                 <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl py-2 text-gray-700 border border-gray-100">
                   <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
-                    <p className="text-xs font-black text-[#0a192f] truncate">{userData?.name || 'Explorer'}</p>
-                    <p className="text-[10px] text-[#00b894] font-bold uppercase tracking-widest">{userRole}</p>
+                    <p className="text-xs font-black text-[#0a192f] truncate">
+                      {userData?.name || 'Explorer'}
+                    </p>
+                    <p className="text-[10px] text-[#00b894] font-bold uppercase tracking-widest">
+                      {userRole}
+                    </p>
                   </div>
 
                   {userRole === 'admin' && (

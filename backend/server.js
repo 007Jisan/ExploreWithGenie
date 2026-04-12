@@ -32,6 +32,109 @@ if (process.env.OPENAI_BASE_URL) {
 
 const openai = new OpenAI(openaiConfig);
 
+const getChatFallbackReply = async (message, language = 'en') => {
+  const normalizedMessage = String(message || '').toLowerCase();
+  const spots = await Spot.find().select('name location category description estimatedBudget').lean();
+
+  const includesAny = (keywords) => keywords.some((keyword) => normalizedMessage.includes(keyword));
+  const matchedSpots = spots
+    .filter((spot) => {
+      const haystack = `${spot.name} ${spot.location} ${spot.category} ${spot.description}`.toLowerCase();
+      return normalizedMessage
+        .split(/\s+/)
+        .filter(Boolean)
+        .some((term) => term.length > 2 && haystack.includes(term));
+    })
+    .slice(0, 3);
+
+  const naturalSpots = spots.filter((spot) => spot.category === 'Natural').slice(0, 2);
+  const historicalSpots = spots.filter((spot) => spot.category === 'Historical').slice(0, 2);
+
+  const isPackingQuestion = includesAny([
+    'carry',
+    'bring',
+    'pack',
+    'packing',
+    'wear',
+    'need with me',
+    'take with me',
+    'what should i take',
+  ]);
+  const isSafetyQuestion = includesAny(['safe', 'safety', 'careful', 'risk', 'danger']);
+  const isBudgetQuestion = includesAny(['budget', 'cheap', 'cost', 'price', 'afford']);
+  const isTransportQuestion = includesAny(['route', 'go', 'reach', 'transport', 'bus', 'train', 'how to get']);
+  const isPlaceQuestion = includesAny([
+    'suggest',
+    'recommend',
+    'place',
+    'spot',
+    'destination',
+    'where should',
+    'where can',
+    'nearby',
+    'visit',
+    'tour',
+  ]);
+
+  if (language === 'bn') {
+    if (isPackingQuestion) {
+      return 'ভ্রমণে হালকা কাপড়, পানি, সানস্ক্রিন, প্রয়োজনীয় ওষুধ, পাওয়ার ব্যাংক, ছাতা বা রেইনকোট, আর আরামদায়ক জুতা সঙ্গে রাখুন। পাহাড় বা প্রকৃতির জায়গায় গেলে মশার স্প্রে আর ছোট টর্চও কাজে লাগে।';
+    }
+
+    if (isSafetyQuestion) {
+      return 'নিরাপত্তার জন্য রাতে নির্জন জায়গা এড়িয়ে চলুন, ফোন চার্জে রাখুন, পানি ও প্রয়োজনীয় ওষুধ সঙ্গে রাখুন, আর স্থানীয় আবহাওয়া ও যাতায়াত পরিস্থিতি আগে দেখে নিন।';
+    }
+
+    if (isBudgetQuestion) {
+      return 'কম বাজেটে ভ্রমণের জন্য লোকাল ট্রান্সপোর্ট ব্যবহার করুন, আগেই থাকার জায়গা ঠিক করুন, আর জনপ্রিয় পর্যটন এলাকার বাইরে স্থানীয় খাবারের দোকান বেছে নিন। চাইলে আমি ১ দিনের বা ২ দিনের কম বাজেটের প্ল্যানও সাজিয়ে দিতে পারি।';
+    }
+
+    if (isTransportQuestion) {
+      return 'যাতায়াতের জন্য আগে গন্তব্য অনুযায়ী বাস, ট্রেন বা লোকাল ট্রান্সপোর্ট দেখে নিন। সকালে রওনা দিলে সাধারণত সময় ও ভিড় দুইটাই কম হয়। চাইলে আপনি কোন জায়গায় যেতে চান বললে আমি রুট সাজিয়ে দিতে পারি।';
+    }
+
+    if (isPlaceQuestion && matchedSpots.length > 0) {
+      return `এই জায়গাগুলো আপনার প্রশ্নের সাথে বেশি মিলে: ${matchedSpots
+        .map((spot) => `${spot.name} (${spot.location})`)
+        .join(', ')}। চাইলে আমি বাজেট, যাতায়াত বা কাছাকাছি আরেকটি জায়গার সাজেশনও দিতে পারি।`;
+    }
+
+    return `আমি এখন লাইভ AI উত্তর দিতে পারছি না, তবে আপনি ${historicalSpots
+      .map((spot) => spot.name)
+      .join(', ')} এর মতো ঐতিহাসিক জায়গা বা ${naturalSpots
+      .map((spot) => spot.name)
+      .join(', ')} এর মতো প্রাকৃতিক জায়গা দেখতে পারেন।`;
+  }
+
+  if (isPackingQuestion) {
+    return 'Carry light clothes, drinking water, sunscreen, basic medicines, a power bank, an umbrella or raincoat, and comfortable shoes. For hill or nature trips, mosquito spray and a small flashlight are also useful.';
+  }
+
+  if (isSafetyQuestion) {
+    return 'For safety, avoid isolated areas at night, keep your phone charged, carry water and essential medicines, and check local weather and transport conditions before you leave.';
+  }
+
+  if (isBudgetQuestion) {
+    return 'For a lower-budget trip, use local transport, book stays in advance, and choose local food spots outside the busiest tourist zones. If you want, I can suggest a cheap 1-day or 2-day Bangladesh trip plan.';
+  }
+
+  if (isTransportQuestion) {
+    return 'Check buses, trains, or local transport based on your destination, and try to start early in the day to avoid traffic and crowds. If you tell me the place name, I can suggest a simple route.';
+  }
+
+  if (isPlaceQuestion && matchedSpots.length > 0) {
+    return `These places match your request best: ${matchedSpots
+      .map((spot) => `${spot.name} (${spot.location})`)
+      .join(', ')}. If you want, I can also suggest budget tips or nearby alternatives.`;
+  }
+
+  return `I can't reach the live AI service right now, but you can try historical places like ${historicalSpots
+    .map((spot) => spot.name)
+    .join(', ')} or natural spots like ${naturalSpots
+    .map((spot) => spot.name)
+    .join(', ')}.`;
+};
+
 // 4. ROUTES
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -71,12 +174,8 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     console.error("OpenAI Error:", error);
 
-    res.json({
-      reply:
-        language === 'bn'
-          ? 'Genie is a little busy right now. Please try again later.'
-          : "I'm a bit busy right now. Please try again later.",
-    });
+    const fallbackReply = await getChatFallbackReply(message, language);
+    res.json({ reply: fallbackReply });
   }
 });
 

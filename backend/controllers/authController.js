@@ -4,6 +4,12 @@ const Experience = require('../models/Experience');
 const jwt = require('jsonwebtoken');
 const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Eshita's Task: Recommendation + rewards + monthly leaderboard pipeline
+// This controller handles:
+// 1) personalized recommendations based on stored user preferences
+// 2) review submission with point updates
+// 3) leaderboard calculation from monthly/all-time activity
+
 const BADGE_RULES = [
   { threshold: 30, badge: 'Bronze Traveler' },
   { threshold: 60, badge: 'Silver Traveler' },
@@ -29,6 +35,22 @@ const awardBadges = (user) => {
 const parseBudgetValue = (budgetText = '') => {
   const digits = String(budgetText).replace(/[^\d]/g, '');
   return digits ? Number(digits) : null;
+};
+
+const CATEGORY_INTEREST_MAP = {
+  historical: 'Historical',
+  history: 'Historical',
+  natural: 'Natural',
+  nature: 'Natural',
+  popular: 'Popular',
+};
+
+const getSelectedCategories = (interests = []) => {
+  return [...new Set(
+    (Array.isArray(interests) ? interests : [])
+      .map((interest) => CATEGORY_INTEREST_MAP[String(interest).trim().toLowerCase()])
+      .filter(Boolean)
+  )];
 };
 
 const getRecommendationScore = (spot, preferences) => {
@@ -211,9 +233,11 @@ exports.getLeaderboard = async (req, res) => {
     monthStart.setHours(0, 0, 0, 0);
 
     const monthlyReviewMap = new Map();
+    const monthlyExperienceMap = new Map();
     const allTimeReviewMap = new Map();
     const allTimeExperienceMap = new Map();
 
+    // Collect both all-time and current-month review activity from tourist spot reviews.
     spots.forEach((spot) => {
       (spot.reviews || []).forEach((review) => {
         const key = String(review.user || '');
@@ -228,6 +252,7 @@ exports.getLeaderboard = async (req, res) => {
       });
     });
 
+    // Agency review activity also contributes to user leaderboard points.
     usersWithAgencyReviews.forEach((agency) => {
       (agency.agencyReviews || []).forEach((review) => {
         const key = String(review.user || '');
@@ -242,6 +267,7 @@ exports.getLeaderboard = async (req, res) => {
       });
     });
 
+    // Travel experiences count as a higher-value contribution.
     experiences.forEach((experience) => {
       const key = String(experience.user || '');
       if (!key) return;
@@ -251,24 +277,23 @@ exports.getLeaderboard = async (req, res) => {
       const createdAt = new Date(experience.createdAt || Date.now());
       if (Number.isNaN(createdAt.getTime()) || createdAt < monthStart) return;
 
-      monthlyReviewMap.set(key, (monthlyReviewMap.get(key) || 0) + 1.5);
+      monthlyExperienceMap.set(key, (monthlyExperienceMap.get(key) || 0) + 1);
     });
 
-    // Keep DB points in sync with stored activities to avoid zero-score leaderboards.
+    // Keep persisted points and badges aligned with the same all-time activity source used everywhere else.
     const syncOps = [];
     topUsers.forEach((user) => {
       const key = String(user._id);
       const computedPoints =
         (allTimeReviewMap.get(key) || 0) * 10 + (allTimeExperienceMap.get(key) || 0) * 15;
+      const nextBadges = BADGE_RULES
+        .filter(({ threshold }) => computedPoints >= threshold)
+        .map(({ badge }) => badge);
 
-      if (computedPoints > (user.points || 0)) {
-        const nextBadges = Array.isArray(user.badges) ? [...user.badges] : [];
-        BADGE_RULES.forEach(({ threshold, badge }) => {
-          if (computedPoints >= threshold && !nextBadges.includes(badge)) {
-            nextBadges.push(badge);
-          }
-        });
-
+      if (
+        computedPoints !== (user.points || 0) ||
+        JSON.stringify(nextBadges) !== JSON.stringify(user.badges || [])
+      ) {
         user.points = computedPoints;
         user.badges = nextBadges;
 
@@ -286,14 +311,17 @@ exports.getLeaderboard = async (req, res) => {
     }
 
     const rankedUsers = topUsers
-      .map((user) => ({
-        ...user,
-        monthlyPoints: Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10),
-        leaderboardPoints:
-          Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10) > 0
-            ? Math.round((monthlyReviewMap.get(String(user._id)) || 0) * 10)
-            : (user.points || 0),
-      }))
+      .map((user) => {
+        const key = String(user._id);
+        const monthlyPoints =
+          (monthlyReviewMap.get(key) || 0) * 10 + (monthlyExperienceMap.get(key) || 0) * 15;
+
+        return {
+          ...user,
+          monthlyPoints,
+          leaderboardPoints: user.points || 0,
+        };
+      })
       .filter((user) => user.role === 'tourist')
       .sort((a, b) => {
         if (b.leaderboardPoints !== a.leaderboardPoints) {
@@ -368,6 +396,7 @@ exports.addReviewAndPoints = async (req, res) => {
     let responseMessage = 'Review submitted! +10 XP earned.';
     let awardedBadges = [];
 
+    // Existing review update: keep content fresh but don't double-award points.
     if (existingReviewIndex >= 0) {
       spot.reviews[existingReviewIndex].rating = reviewPayload.rating;
       spot.reviews[existingReviewIndex].comment = reviewPayload.comment;
@@ -376,6 +405,7 @@ exports.addReviewAndPoints = async (req, res) => {
       spot.reviews[existingReviewIndex].userName = reviewPayload.userName;
       responseMessage = 'Your review has been updated successfully.';
     } else {
+      // First review on this spot by this user: award contribution points.
       spot.reviews.unshift(reviewPayload);
       user.points = (Number(user.points) || 0) + 10;
       awardedBadges = awardBadges(user);
@@ -446,7 +476,13 @@ exports.getRecommendations = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const spots = await Spot.find();
-    const rankedSpots = spots
+    const selectedCategories = getSelectedCategories(user.interests);
+    const candidateSpots =
+      selectedCategories.length > 0
+        ? spots.filter((spot) => selectedCategories.includes(spot.category || 'Popular'))
+        : spots;
+
+    const rankedSpots = candidateSpots
       .map((spot) => ({
         ...spot.toObject(),
         score: getRecommendationScore(spot, user),

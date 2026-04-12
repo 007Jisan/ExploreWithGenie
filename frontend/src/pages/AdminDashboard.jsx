@@ -33,6 +33,7 @@ const AdminDashboard = () => {
   const [editingSpotId, setEditingSpotId] = useState('');
   const [spotForm, setSpotForm] = useState(emptySpotForm);
 
+  // Load all admin panels in one place so dashboard cards/tabs stay in sync.
   const fetchAdminData = async () => {
     try {
       const statsRes = await fetch('http://localhost:5000/api/admin/stats', {
@@ -100,6 +101,7 @@ const AdminDashboard = () => {
       });
       const data = await res.json();
       if (res.ok) {
+        // Local state update avoids a full refetch after moderation action.
         setSpots((prev) =>
           prev.map((spot) =>
             spot._id === spotId
@@ -144,9 +146,18 @@ const AdminDashboard = () => {
     setStatusMessage('');
     setErrorMessage('');
 
+    const normalizedLat = spotForm.lat === '' ? NaN : Number(spotForm.lat);
+    const normalizedLng = spotForm.lng === '' ? NaN : Number(spotForm.lng);
+
+    if (Number.isNaN(normalizedLat) || Number.isNaN(normalizedLng)) {
+      setErrorMessage('Latitude and longitude are required.');
+      return;
+    }
+
     const endpoint = editingSpotId
       ? `http://localhost:5000/api/admin/spots/${editingSpotId}`
       : 'http://localhost:5000/api/admin/spots';
+    // Same form handles both create and edit based on editingSpotId.
     const method = editingSpotId ? 'PUT' : 'POST';
 
     try {
@@ -158,8 +169,8 @@ const AdminDashboard = () => {
         },
         body: JSON.stringify({
           ...spotForm,
-          lat: Number(spotForm.lat),
-          lng: Number(spotForm.lng),
+          lat: normalizedLat,
+          lng: normalizedLng,
         }),
       });
       const data = await res.json();
@@ -207,6 +218,7 @@ const AdminDashboard = () => {
   };
 
   const moderationReviews = spots.flatMap((spot) =>
+    // Flatten nested spot reviews for the moderation table.
     (spot.reviews || []).map((review) => ({
       ...review,
       spotId: spot._id,

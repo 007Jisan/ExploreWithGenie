@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
+// Tourist rating + written review submission flow.
+// Supports first-time submit and later update from the same user.
 const ReviewSection = ({ spotId, existingReviews = [], onReviewCreated }) => {
   const { t } = useLanguage();
   const [rating, setRating] = useState(5);
@@ -77,10 +79,13 @@ const ReviewSection = ({ spotId, existingReviews = [], onReviewCreated }) => {
       <div className="space-y-4 mb-8 max-h-72 overflow-y-auto pr-2">
         {sortedReviews.length > 0 ? (
           sortedReviews.map((review) => (
-            <div key={review._id || `${review.user}-${review.createdAt}`} className="bg-slate-50 rounded-2xl p-4">
+            <div
+              key={review._id || `${review.user}-${review.createdAt}`}
+              className="bg-slate-50 rounded-2xl p-4"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="font-bold text-[#0a192f]">{review.userName}</p>
-                <p className="text-amber-500 text-sm">{'★'.repeat(review.rating)}</p>
+                <p className="text-amber-500 text-sm">{'\u2605'.repeat(review.rating)}</p>
               </div>
               <p className="text-sm text-slate-600">{review.comment}</p>
               <p className="text-xs text-slate-400 mt-2">{review.date}</p>

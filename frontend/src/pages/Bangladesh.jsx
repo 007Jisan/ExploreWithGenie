@@ -4,10 +4,15 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useLanguage } from '../context/LanguageContext';
 import Recommendation from '../components/Recommendation';
+import { clearStoredAuth, getValidToken } from '../utils/auth';
 
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
+// Eshita's Task: Detailed tourist spot profile + tourist review interaction
+// This page provides:
+// 1) rich spot detail modal (description, budget, hotels, safety, map)
+// 2) review submit/update flow connected to contribution points
 const defaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -56,11 +61,12 @@ const Bangladesh = () => {
   const [userPreferences, setUserPreferences] = useState(null);
   const { t } = useLanguage();
   const currentUserId = localStorage.getItem('userId');
-  const token = localStorage.getItem('token');
+  const token = getValidToken();
 
   const sortedSelectedReviews = [...(selectedSpot?.reviews || [])].sort(
     (a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)
   );
+  // Detect if current user already reviewed this spot to support "update review" UX.
   const existingUserReview = sortedSelectedReviews.find(
     (review) => String(review.user) === String(currentUserId)
   );
@@ -86,8 +92,10 @@ const Bangladesh = () => {
     });
   };
 
+  // Primary spot feed used by cards and modal previews.
   const fetchSpots = async () => {
     try {
+      // Source of truth for cards + modal data.
       const res = await fetch('http://localhost:5000/api/spots');
       const data = await res.json();
       setPlaces(data);
@@ -121,6 +129,11 @@ const Bangladesh = () => {
         const response = await fetch('http://localhost:5000/api/auth/profile', {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (response.status === 401) {
+          clearStoredAuth();
+          setUserPreferences(null);
+          return;
+        }
         const data = await response.json();
         if (response.ok) {
           setUserPreferences({
@@ -141,6 +154,7 @@ const Bangladesh = () => {
     if (!spotId) return;
 
     try {
+      // Refresh latest server-side review state when submit returns a validation/error response.
       const response = await fetch(`http://localhost:5000/api/spots/${spotId}`);
       if (!response.ok) return;
       const latestSpot = await response.json();
@@ -150,6 +164,7 @@ const Bangladesh = () => {
     }
   };
 
+  // Open Google Maps with current location when available; otherwise nearest city fallback.
   const openDynamicRouteMap = (spot) => {
     const destination = `${spot.name}, ${spot.location}, Bangladesh`;
     const nearestCity = fallbackCities.reduce((closest, city) => {
@@ -197,6 +212,7 @@ const Bangladesh = () => {
     }
 
     try {
+      // Review endpoint also updates contribution points for Eshita's reward flow.
       const res = await fetch('http://localhost:5000/api/auth/review', {
         method: 'POST',
         headers: {
@@ -212,6 +228,7 @@ const Bangladesh = () => {
 
       const data = await res.json();
       if (res.ok) {
+        // Optimistically update modal review list, then refresh grid data.
         upsertSelectedSpotReview(data.newReview);
         setComment('');
         setReviewSuccess(data.message || 'Review submitted successfully.');
