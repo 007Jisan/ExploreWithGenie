@@ -1,4 +1,9 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
+// Eshita's Task: Monthly leaderboard with achievement badges
+// Frontend responsibility:
+// - fetch ranked tourist contributors
+// - show badges and contribution score in a readable leaderboard table
 
 const Leaderboard = () => {
   const [topUsers, setTopUsers] = useState([]);
@@ -7,6 +12,7 @@ const Leaderboard = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
+        // Backend returns pre-ranked users with contribution metrics.
         const res = await fetch('http://localhost:5000/api/auth/leaderboard');
         const data = await res.json();
         if (res.ok) {
@@ -139,3 +145,4 @@ const Leaderboard = () => {
 };
 
 export default Leaderboard;
+

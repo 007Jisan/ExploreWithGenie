@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+// Eshita's Task: Travel experience storage for contribution points and stories feed.
 const experienceSchema = new mongoose.Schema(
   {
     user: {

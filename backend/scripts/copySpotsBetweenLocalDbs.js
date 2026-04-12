@@ -17,6 +17,7 @@ async function copySpots() {
     const sourceCollection = sourceConnection.collection(COLLECTION);
     const targetCollection = targetConnection.collection(COLLECTION);
 
+    // Pull everything from source spots and recreate target spots snapshot.
     const docs = await sourceCollection.find({}).toArray();
 
     await targetCollection.deleteMany({});

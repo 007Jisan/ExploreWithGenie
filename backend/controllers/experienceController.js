@@ -1,6 +1,9 @@
 const Experience = require('../models/Experience');
 const User = require('../models/User');
 
+// Eshita's Task: Contribution points for shared travel experiences
+// Each valid experience post awards XP and can unlock badges.
+
 const BADGE_RULES = [
   { threshold: 30, badge: 'Bronze Traveler' },
   { threshold: 60, badge: 'Silver Traveler' },
@@ -53,6 +56,7 @@ exports.createExperience = async (req, res) => {
       location: (location || '').trim(),
     });
 
+    // Sharing a travel story is a high-value contribution in Module 3.
     user.points = (Number(user.points) || 0) + 15;
     const awardedBadges = awardBadges(user);
     await user.save();

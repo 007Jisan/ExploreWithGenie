@@ -1,6 +1,9 @@
 ﻿const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+// Eshita's Task:
+// - stores contribution points and earned badges
+// - keeps review contribution data used in leaderboard aggregation
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -22,7 +25,7 @@ const UserSchema = new mongoose.Schema({
   address: { type: String, default: '' },
   bio: { type: String, default: '' },
 
-  // 🤖 Module 2: AI & Recommendation (Jisan/Eshita's Task)
+  // 🤖 Module 2: AI & Recommendation (Jisan Task)
   budgetPreference: { type: String, enum: ['Low', 'Medium', 'High', ''], default: '' },
   tripDurationPreference: { type: String, default: '' }, 
   interests: [{ type: String }], // যেমন: ['Hiking', 'Beach', 'History']

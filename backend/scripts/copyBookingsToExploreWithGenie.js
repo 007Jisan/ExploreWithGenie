@@ -17,6 +17,7 @@ async function copyBookings() {
     const sourceCollection = sourceConnection.collection(COLLECTION);
     const targetCollection = targetConnection.collection(COLLECTION);
 
+    // Upsert by _id so repeated runs are safe and do not duplicate bookings.
     const docs = await sourceCollection.find({}).toArray();
 
     let copied = 0;
