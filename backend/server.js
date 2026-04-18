@@ -32,6 +32,89 @@ if (process.env.OPENAI_BASE_URL) {
 
 const openai = new OpenAI(openaiConfig);
 
+const LANGUAGE_NAME_MAP = {
+  bn: 'Bengali',
+  en: 'English',
+  bengali: 'Bengali',
+  bangla: 'Bengali',
+  english: 'English',
+};
+
+const detectLanguageCode = (value = '') => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'bn' || normalized === 'bengali' || normalized === 'bangla' ? 'bn' : 'en';
+};
+
+const containsBanglaText = (value = '') => /[\u0980-\u09FF]/.test(String(value || ''));
+
+const buildTranslationFallback = (text, sourceLanguage, targetLanguage) => {
+  if (!String(text || '').trim()) {
+    return '';
+  }
+
+  if (sourceLanguage === targetLanguage) {
+    return String(text);
+  }
+
+  if (sourceLanguage === 'bn' && targetLanguage === 'en') {
+    return `Translation service is temporarily unavailable. Bengali text received: ${text}`;
+  }
+
+  if (sourceLanguage === 'en' && targetLanguage === 'bn') {
+    return `ট্রান্সলেশন সার্ভিস এখন সাময়িকভাবে বন্ধ আছে। ইংরেজি লেখা পাওয়া গেছে: ${text}`;
+  }
+
+  return String(text);
+};
+
+const translateText = async ({
+  text,
+  sourceLanguage = 'auto',
+  targetLanguage = 'en',
+}) => {
+  const normalizedText = String(text || '').trim();
+  const normalizedTarget = detectLanguageCode(targetLanguage);
+  const normalizedSource =
+    sourceLanguage === 'auto'
+      ? containsBanglaText(normalizedText)
+        ? 'bn'
+        : 'en'
+      : detectLanguageCode(sourceLanguage);
+
+  if (!normalizedText) {
+    return { translatedText: '', sourceLanguage: normalizedSource, targetLanguage: normalizedTarget };
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a translation engine. Translate the user's text from ${LANGUAGE_NAME_MAP[normalizedSource]} to ${LANGUAGE_NAME_MAP[normalizedTarget]}. Return only the translated text with no explanation.`,
+        },
+        { role: 'user', content: normalizedText },
+      ],
+    });
+
+    return {
+      translatedText: completion.choices[0].message.content?.trim() || normalizedText,
+      sourceLanguage: normalizedSource,
+      targetLanguage: normalizedTarget,
+    };
+  } catch (error) {
+    return {
+      translatedText: buildTranslationFallback(
+        normalizedText,
+        normalizedSource,
+        normalizedTarget
+      ),
+      sourceLanguage: normalizedSource,
+      targetLanguage: normalizedTarget,
+    };
+  }
+};
+
 const getChatFallbackReply = async (message, language = 'en') => {
   const normalizedMessage = String(message || '').toLowerCase();
   const spots = await Spot.find().select('name location category description estimatedBudget').lean();
@@ -164,7 +247,7 @@ app.post('/api/chat', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: `You are a helpful travel assistant named Genie for Explore with Genie. Reply only in ${targetLanguage}. Help with travel questions, itinerary planning, safety tips, route guidance, and budget advice focused on Bangladesh.`,
+          content: `You are a helpful travel assistant named Genie for Explore with Genie. Reply only in ${targetLanguage}. Help with travel questions, itinerary planning, safety tips, route guidance, and budget advice focused on Bangladesh. If the user asks for translation between Bengali and English, translate accurately and return only the translated answer in ${targetLanguage}.`,
         },
         { role: 'user', content: message },
       ],
@@ -176,6 +259,21 @@ app.post('/api/chat', async (req, res) => {
 
     const fallbackReply = await getChatFallbackReply(message, language);
     res.json({ reply: fallbackReply });
+  }
+});
+
+app.post('/api/translate', async (req, res) => {
+  const { text, sourceLanguage = 'auto', targetLanguage = 'en' } = req.body;
+
+  if (!String(text || '').trim()) {
+    return res.status(400).json({ message: 'Text is required for translation.' });
+  }
+
+  try {
+    const result = await translateText({ text, sourceLanguage, targetLanguage });
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ message: 'Translation service failed.' });
   }
 });
 

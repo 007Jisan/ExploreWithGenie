@@ -1,12 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { useLanguage } from '../context/LanguageContext'; // 👈 ইম্পোর্ট করলাম
+import { useLanguage } from '../context/LanguageContext';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { t, language } = useLanguage(); // 👈 ল্যাঙ্গুয়েজ ফাংশন নিলাম
-  const token = localStorage.getItem('token'); 
+  const { t, language } = useLanguage();
+  const token = localStorage.getItem('token');
 
   const countries = [
     { name: 'Bangladesh', image: 'https://images.pexels.com/photos/725100/pexels-photo-725100.jpeg', locked: false },
@@ -23,21 +23,21 @@ const Home = () => {
   const handleExplore = (country) => {
     if (country.name === 'Bangladesh') {
       if (token) {
-        navigate('/country/bangladesh'); 
+        navigate('/country/bangladesh');
       } else {
         Swal.fire({
-          title: t('loginTitle'), // 👈 ডাইনামিক টাইটেল
-          text: t('loginText'),   // 👈 ডাইনামিক টেক্সট
+          title: t('loginTitle'),
+          text: t('loginText'),
           icon: 'warning',
           confirmButtonColor: '#006a4e',
-          confirmButtonText: language === 'en' ? 'Go to Login' : 'লগইন করুন'
+          confirmButtonText: language === 'en' ? 'Go to Login' : 'লগইন করুন',
         }).then((result) => {
           if (result.isConfirmed) navigate('/login');
         });
       }
     } else {
       Swal.fire({
-        title: `${country.name} ${t('lockedTitle')}`, 
+        title: `${country.name} ${t('lockedTitle')}`,
         text: t('lockedText'),
         icon: 'info',
         confirmButtonColor: '#0a192f',
@@ -47,13 +47,12 @@ const Home = () => {
 
   return (
     <div className="container mx-auto px-4 py-12">
-      {/* 🧞‍♂️ টাইটেল এখন ভাষা অনুযায়ী বদলাবে */}
       <h2 className="text-3xl font-bold text-center mb-10 text-[#006a4e]">{t('exploreTitle')}</h2>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {countries.map((country, index) => (
-          <div 
-            key={index} 
+          <div
+            key={index}
             onClick={() => handleExplore(country)}
             className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all overflow-hidden border border-gray-100 cursor-pointer transform hover:-translate-y-1"
           >
@@ -69,11 +68,10 @@ const Home = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="p-5">
               <h3 className="text-xl font-bold text-gray-800">{country.name}</h3>
               <p className="text-sm font-medium text-[#006a4e] mt-1">
-                {/* 🧞‍♂️ কন্ডিশনাল ট্রান্সলেশন */}
                 {country.name === 'Bangladesh' ? t('available') : t('comingSoon')}
               </p>
             </div>

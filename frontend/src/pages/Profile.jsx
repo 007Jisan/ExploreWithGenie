@@ -27,6 +27,7 @@ const Profile = () => {
   const [experienceError, setExperienceError] = useState('');
   const [experiences, setExperiences] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
+  const [myInquiries, setMyInquiries] = useState([]);
   const [experienceForm, setExperienceForm] = useState({
     title: '',
     location: '',
@@ -80,9 +81,23 @@ const Profile = () => {
       }
     };
 
+    const fetchInquiries = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/agency/my-inquiries', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setMyInquiries(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching inquiries:', error);
+      }
+    };
+
     fetchProfile();
     fetchExperiences();
     fetchBookings();
+    fetchInquiries();
   }, [token, navigate]);
 
   const handleSave = async (e) => {
@@ -424,6 +439,9 @@ const Profile = () => {
                       <h3 className="font-bold text-lg text-[#0a192f]">{booking.package?.title || 'Unknown Package'}</h3>
                       <p className="text-sm text-gray-500">Agency: {booking.agency?.name || 'Unknown agency'}</p>
                       <p className="text-xs text-gray-400 mt-1">Booked on: {new Date(booking.createdAt).toLocaleDateString()}</p>
+                      {booking.travelerNotification && (
+                        <p className="text-xs text-emerald-600 font-semibold mt-2">{booking.travelerNotification}</p>
+                      )}
                     </div>
 
                     <div className="flex flex-col items-center sm:items-end">
@@ -438,6 +456,55 @@ const Profile = () => {
                         {booking.status}
                       </span>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {String(user.role || '').toLowerCase() === 'tourist' && (
+          <div className="bg-white rounded-[2.5rem] p-12 shadow-xl border border-slate-100">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+              <h2 className="text-2xl font-bold text-[#0a192f]">My Inquiry Updates</h2>
+            </div>
+
+            {myInquiries.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                <p className="text-gray-500 font-medium">No inquiry history found yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myInquiries.map((inquiry) => (
+                  <div key={inquiry._id} className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-lg text-[#0a192f]">{inquiry.package?.title || 'Package inquiry'}</h3>
+                        <p className="text-sm text-gray-500">
+                          Agency: {inquiry.agency?.name || 'Unknown agency'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Sent on: {new Date(inquiry.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        inquiry.status === 'replied'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {inquiry.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 mt-4">{inquiry.message}</p>
+                    {inquiry.replyMessage ? (
+                      <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                        Agency reply: {inquiry.replyMessage}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-amber-600 font-semibold mt-4">
+                        Waiting for agency response.
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

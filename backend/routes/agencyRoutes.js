@@ -10,6 +10,7 @@ const {
   replyToInquiry,
   getPublicPackages,
   createInquiry,
+  getMyInquiries,
   createAgencyReview,
 } = require('../controllers/agencyController');
 const {
@@ -27,6 +28,7 @@ router.get('/inquiries', protect, isAgency, getInquiries);
 router.post('/inquiries/:id/reply', protect, isAgency, replyToInquiry);
 router.get('/public-packages', getPublicPackages);
 router.post('/public-inquiries', protect, isTourist, createInquiry);
+router.get('/my-inquiries', protect, isTourist, getMyInquiries);
 router.post('/public-review', protect, isTourist, createAgencyReview);
 
 module.exports = router;

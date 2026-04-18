@@ -7,6 +7,7 @@ const {
   getAllUsers, 
   getAllSpots,
   getAllExperiences,
+  getAllPackages,
   createSpot,
   updateSpot,
   deleteSpot,
@@ -28,6 +29,7 @@ router.get('/stats', protect, isAdmin, getAdminStats);
 // ২. সব ইউজার এবং এজেন্সির লিস্ট দেখা (Admin Table এর জন্য)
 router.get('/users', protect, isAdmin, getAllUsers);
 router.get('/spots', protect, isAdmin, getAllSpots);
+router.get('/packages', protect, isAdmin, getAllPackages);
 router.get('/experiences', protect, isAdmin, getAllExperiences);
 router.post('/spots', protect, isAdmin, createSpot);
 router.put('/spots/:id', protect, isAdmin, updateSpot);

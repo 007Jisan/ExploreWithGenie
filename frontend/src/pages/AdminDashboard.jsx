@@ -22,10 +22,12 @@ const AdminDashboard = () => {
     pendingAgencies: 0,
     totalReviews: 0,
     totalExperiences: 0,
+    totalPackages: 0,
   });
   const [users, setUsers] = useState([]);
   const [spots, setSpots] = useState([]);
   const [experiences, setExperiences] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -59,6 +61,12 @@ const AdminDashboard = () => {
       });
       const experiencesData = await experiencesRes.json();
       if (experiencesRes.ok) setExperiences(experiencesData);
+
+      const packagesRes = await fetch('http://localhost:5000/api/admin/packages', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const packagesData = await packagesRes.json();
+      if (packagesRes.ok) setPackages(packagesData);
     } catch (err) {
       setErrorMessage('Failed to fetch admin data.');
     } finally {
@@ -263,13 +271,14 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           {[
             { label: 'Total Users', value: stats.totalUsers, color: 'text-[#0a192f]', icon: '👥' },
             { label: 'Total Agencies', value: stats.totalAgencies, color: 'text-[#0a192f]', icon: '🏢' },
             { label: 'Pending Verification', value: stats.pendingAgencies, color: 'text-orange-500', icon: '🛡️' },
             { label: 'Total Reviews', value: stats.totalReviews, color: 'text-[#00df9a]', icon: '💬' },
             { label: 'Travel Stories', value: stats.totalExperiences, color: 'text-[#0a192f]', icon: '📖' },
+            { label: 'Tour Packages', value: stats.totalPackages, color: 'text-[#0a192f]', icon: '🎒' },
           ].map((item) => (
             <div key={item.label} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
               <span className="text-2xl">{item.icon}</span>
@@ -476,6 +485,45 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               ))}
+
+              <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h4 className="font-black text-[#0a192f] text-lg">Published Tour Packages</h4>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    {packages.length} Packages
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {packages.length > 0 ? (
+                    packages.map((pkg) => (
+                      <div key={pkg._id} className="rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              {pkg.agency?.name || pkg.agencyId?.name || 'Unassigned agency'}
+                            </p>
+                            <h5 className="text-[#0a192f] font-black">{pkg.title}</h5>
+                            <p className="text-sm text-slate-500">
+                              {pkg.location || 'Location not set'} • {pkg.duration || 'Duration not set'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[#00a36c] font-black">BDT {pkg.price}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              {pkg.isActive ? 'Active' : 'Hidden'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-[1.5rem] border-2 border-dashed border-slate-200 py-10 text-center text-sm font-semibold text-slate-400">
+                      No packages available yet.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

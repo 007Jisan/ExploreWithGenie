@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Spot = require('../models/Spot');
 const Experience = require('../models/Experience');
+const Package = require('../models/Package');
 
 exports.getAdminStats = async (req, res) => {
   try {
@@ -8,6 +9,7 @@ exports.getAdminStats = async (req, res) => {
     const totalAgencies = await User.countDocuments({ role: 'agency' });
     const pendingAgencies = await User.countDocuments({ role: 'agency', isVerified: false });
     const totalExperiences = await Experience.countDocuments();
+    const totalPackages = await Package.countDocuments();
 
     const spots = await Spot.find().select('reviews');
     const totalReviews = spots.reduce(
@@ -21,6 +23,7 @@ exports.getAdminStats = async (req, res) => {
       pendingAgencies,
       totalReviews,
       totalExperiences,
+      totalPackages,
       totalSpots: spots.length,
     });
   } catch (err) {
@@ -52,6 +55,30 @@ exports.getAllExperiences = async (req, res) => {
     res.json(experiences);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching travel experiences' });
+  }
+};
+
+exports.getAllPackages = async (req, res) => {
+  try {
+    const packages = await Package.find()
+      .populate('agency', 'name email')
+      .populate('agencyId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json(
+      packages.map((pkg) => {
+        const packageObject = pkg.toObject();
+        const normalizedAgency = packageObject.agency || packageObject.agencyId;
+
+        return {
+          ...packageObject,
+          agency: normalizedAgency,
+          agencyId: normalizedAgency,
+        };
+      })
+    );
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching packages' });
   }
 };
 

@@ -34,6 +34,7 @@ exports.addPackage = async (req, res) => {
 
     const newPackage = new Package({
       agency: req.user.id,
+      agencyId: req.user.id,
       title,
       description,
       price: Number(price),
@@ -51,7 +52,9 @@ exports.addPackage = async (req, res) => {
 
 exports.getAgencyPackages = async (req, res) => {
   try {
-    const packages = await Package.find({ agency: req.user.id }).sort({ createdAt: -1 });
+    const packages = await Package.find({
+      $or: [{ agency: req.user.id }, { agencyId: req.user.id }],
+    }).sort({ createdAt: -1 });
     res.json(packages);
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
@@ -67,8 +70,13 @@ exports.updatePackage = async (req, res) => {
     }
 
     const updatedPackage = await Package.findOneAndUpdate(
-      { _id: req.params.id, agency: req.user.id },
       {
+        _id: req.params.id,
+        $or: [{ agency: req.user.id }, { agencyId: req.user.id }],
+      },
+      {
+        agency: req.user.id,
+        agencyId: req.user.id,
         title,
         description,
         price: Number(price),
@@ -93,7 +101,7 @@ exports.deletePackage = async (req, res) => {
   try {
     const deletedPackage = await Package.findOneAndDelete({
       _id: req.params.id,
-      agency: req.user.id,
+      $or: [{ agency: req.user.id }, { agencyId: req.user.id }],
     });
 
     if (!deletedPackage) {
@@ -155,10 +163,24 @@ exports.getPublicPackages = async (req, res) => {
     }
 
     const packages = await Package.find(query)
-      .populate('agency', 'name profilePicture agencyReviews')
+      .populate('agency', 'name profilePicture agencyReviews isVerified')
+      .populate('agencyId', 'name profilePicture agencyReviews isVerified')
       .sort({ createdAt: -1 });
 
-    res.json(packages);
+    const normalizedPackages = packages
+      .map((pkg) => {
+        const packageObject = pkg.toObject();
+        const normalizedAgency = packageObject.agency || packageObject.agencyId;
+
+        return {
+          ...packageObject,
+          agency: normalizedAgency,
+          agencyId: normalizedAgency,
+        };
+      })
+      .filter((pkg) => pkg.agency?._id && pkg.agency.isVerified !== false);
+
+    res.json(normalizedPackages);
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
   }
@@ -183,13 +205,26 @@ exports.createInquiry = async (req, res) => {
 
     const inquiry = await Inquiry.create({
       package: selectedPackage._id,
-      agency: selectedPackage.agency,
+      agency: selectedPackage.agency || selectedPackage.agencyId,
       user: user._id,
       userName: user.name,
       message: message.trim(),
     });
 
     res.status(201).json({ message: 'Inquiry sent successfully.', inquiry });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+exports.getMyInquiries = async (req, res) => {
+  try {
+    const inquiries = await Inquiry.find({ user: req.user.id })
+      .populate('agency', 'name')
+      .populate('package', 'title location')
+      .sort({ createdAt: -1 });
+
+    res.json(inquiries);
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
   }

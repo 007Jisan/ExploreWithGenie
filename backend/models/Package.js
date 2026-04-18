@@ -27,4 +27,16 @@ const packageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+packageSchema.pre('validate', function syncAgencyFields(next) {
+  if (this.agency && !this.agencyId) {
+    this.agencyId = this.agency;
+  }
+
+  if (this.agencyId && !this.agency) {
+    this.agency = this.agencyId;
+  }
+
+  next();
+});
+
 module.exports = mongoose.model('Package', packageSchema);

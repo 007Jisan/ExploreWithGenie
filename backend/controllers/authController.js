@@ -3,6 +3,62 @@ const Spot = require('../models/Spot');
 const Experience = require('../models/Experience');
 const jwt = require('jsonwebtoken');
 const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PASSWORD_REGEX = /^.{8,64}$/;
+const ALLOWED_SIGNUP_ROLES = ['tourist', 'agency'];
+const AUTH_WINDOW_MS = 10 * 60 * 1000;
+const MAX_LOGIN_ATTEMPTS = 8;
+const MAX_SIGNUP_ATTEMPTS = 5;
+const authAttemptStore = new Map();
+
+const normalizeName = (value = '') => String(value || '').trim().replace(/\s+/g, ' ');
+const getClientIp = (req) =>
+  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+  req.ip ||
+  req.connection?.remoteAddress ||
+  'unknown';
+const getAuthAttemptKey = (req, scope) => `${scope}:${getClientIp(req)}`;
+
+const getRateLimitState = (key, maxAttempts) => {
+  const now = Date.now();
+  const current = authAttemptStore.get(key);
+
+  if (!current || now > current.expiresAt) {
+    const freshState = { count: 0, expiresAt: now + AUTH_WINDOW_MS, maxAttempts };
+    authAttemptStore.set(key, freshState);
+    return freshState;
+  }
+
+  current.maxAttempts = maxAttempts;
+  return current;
+};
+
+const ensureWithinRateLimit = (req, res, scope, maxAttempts) => {
+  const key = getAuthAttemptKey(req, scope);
+  const state = getRateLimitState(key, maxAttempts);
+
+  if (state.count >= state.maxAttempts) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((state.expiresAt - Date.now()) / 1000));
+    res.set('Retry-After', String(retryAfterSeconds));
+    res.status(429).json({
+      message: 'Too many attempts. Please wait a few minutes before trying again.',
+    });
+    return null;
+  }
+
+  return { key, state };
+};
+
+const registerAuthFailure = (key) => {
+  const state = authAttemptStore.get(key);
+  if (state) {
+    state.count += 1;
+  }
+};
+
+const clearAuthFailures = (key) => {
+  authAttemptStore.delete(key);
+};
 
 // Eshita's Task: Recommendation + rewards + monthly leaderboard pipeline
 // This controller handles:
@@ -89,18 +145,54 @@ const getRecommendationScore = (spot, preferences) => {
 };
 
 exports.signup = async (req, res) => {
+  const rateLimitContext = ensureWithinRateLimit(req, res, 'signup', MAX_SIGNUP_ATTEMPTS);
+  if (!rateLimitContext) return;
+
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, confirmPassword } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    if (!name || !email || !password) {
+    const normalizedName = normalizeName(name);
+
+    if (!normalizedName || !email || !password) {
+      registerAuthFailure(rateLimitContext.key);
       return res.status(400).json({ message: 'Name, email and password are required.' });
     }
 
+    if (normalizedName.length < 2 || normalizedName.length > 60) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Full name must be between 2 and 60 characters.' });
+    }
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
+
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Password and confirm password do not match.' });
+    }
+
+    if (!PASSWORD_REGEX.test(String(password || ''))) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({
+        message: 'Password must be at least 8 characters long.',
+      });
+    }
+
+    if (role && !ALLOWED_SIGNUP_ROLES.includes(role)) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Only tourist or agency accounts can be created here.' });
+    }
+
     let user = await User.findOne({ email: normalizedEmail });
-    if (user) return res.status(400).json({ message: 'User already exists' });
+    if (user) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'An account with this email already exists.' });
+    }
 
     user = new User({
-      name: String(name).trim(),
+      name: normalizedName,
       email: normalizedEmail,
       password,
       role: role || 'tourist',
@@ -109,6 +201,7 @@ exports.signup = async (req, res) => {
     });
 
     await user.save();
+    clearAuthFailures(rateLimitContext.key);
     return res.status(201).json({ message: 'User registered successfully.' });
   } catch (err) {
     return res.status(500).json({ message: 'Server Error during signup' });
@@ -116,9 +209,18 @@ exports.signup = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
+  const rateLimitContext = ensureWithinRateLimit(req, res, 'login', MAX_LOGIN_ATTEMPTS);
+  if (!rateLimitContext) return;
+
   try {
     const { email, password } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPassword = String(password || '');
+
+    if (!EMAIL_REGEX.test(normalizedEmail) || !normalizedPassword) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Enter a valid email and password.' });
+    }
 
     let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
@@ -127,10 +229,16 @@ exports.login = async (req, res) => {
       });
     }
 
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!user) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Invalid email or password.' });
+    }
 
-    const isMatch = await user.comparePassword(String(password || ''));
-    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+    const isMatch = await user.comparePassword(normalizedPassword);
+    if (!isMatch) {
+      registerAuthFailure(rateLimitContext.key);
+      return res.status(400).json({ message: 'Invalid email or password.' });
+    }
 
     const payload = {
       user: { id: user._id, name: user.name, role: user.role },
@@ -139,6 +247,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secretKey', {
       expiresIn: '1d',
     });
+    clearAuthFailures(rateLimitContext.key);
 
     return res.json({
       token,

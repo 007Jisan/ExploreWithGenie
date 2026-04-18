@@ -1,20 +1,37 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password) {
+      setErrorMessage('Password is required.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       const data = await response.json();
@@ -33,10 +50,12 @@ const Login = () => {
           window.location.href = '/';
         }
       } else {
-        setErrorMessage(data.message || 'Login failed! Please check your credentials.');
+        setErrorMessage(data.message || 'Login failed. Please check your credentials.');
       }
     } catch (error) {
       setErrorMessage('Server error. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,6 +81,8 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
+              inputMode="email"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00df9a] focus:border-[#0a192f] outline-none transition-all bg-gray-50 focus:bg-white"
               placeholder="name@example.com"
             />
@@ -74,19 +95,24 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00df9a] focus:border-[#0a192f] outline-none transition-all bg-gray-50 focus:bg-white"
-              placeholder="********"
+              placeholder="Enter your password"
             />
           </div>
 
-          <button type="submit" className="w-full bg-[#0a192f] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#00df9a] hover:text-[#0a192f] transition-all duration-300 transform active:scale-95 shadow-md">
-            Log In
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#0a192f] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#00df9a] hover:text-[#0a192f] transition-all duration-300 transform active:scale-95 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Signing In...' : 'Log In'}
           </button>
         </form>
 
         <div className="mt-8 text-center border-t pt-6">
           <p className="text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link to="/signup" className="text-[#00df9a] font-bold hover:text-[#00b37a] transition-colors">
               Sign up here
             </Link>

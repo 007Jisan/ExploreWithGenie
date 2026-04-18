@@ -205,7 +205,7 @@ const AgencyDashboard = () => {
 
       setBookings((prev) =>
         prev.map((booking) =>
-          booking._id === bookingId ? { ...booking, status } : booking
+          booking._id === bookingId ? { ...booking, ...data.booking } : booking
         )
       );
       setStatusMessage(`Booking ${status.toLowerCase()} successfully.`);
